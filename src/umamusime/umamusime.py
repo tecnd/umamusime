@@ -45,6 +45,23 @@ class UmaState(pyspiel.State):
             return pyspiel.PlayerId.CHANCE
         return 0
 
+    def action_to_string(self, player, action):
+        match action:
+            case 0:
+                return "rest"
+            case 1:
+                return "train_speed"
+            case 2:
+                return "train_stamina"
+            case 3:
+                return "train_power"
+            case 4:
+                return "train_guts"
+            case 5:
+                return "train_wit"
+            case _:
+                raise ValueError(f"Invalid action: {action}")
+
     def legal_actions(self, player=None):
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
