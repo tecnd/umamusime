@@ -1,0 +1,27 @@
+[project]
+name = "umamusime"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Kerry Wang", email = "10476898+tecnd@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "open-spiel[full]>=2.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.0",
+]
+
+[project.scripts]
+umamusime = "umamusime:main"
+
+[tool.ty.environment]
+extra-paths = ["./typings"]
+
+[build-system]
+requires = ["uv_build>=0.10.8,<0.11.0"]
+build-backend = "uv_build"
