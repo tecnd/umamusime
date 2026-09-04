@@ -1,11 +1,15 @@
 import numpy as np
+import pyspiel
 from open_spiel.python.algorithms import mcts
 
 from .umamusime import UmaGame, UmaState
 
 
 def main() -> None:
-    game = UmaGame()
+    # MCTSBot rejects non-TERMINAL reward_model, but that is only a metadata
+    # check. This game already implements returns() and the rest of the State
+    # API MCTS needs; per-turn rewards stay on the default game for DQN.
+    game = UmaGame(reward_model=pyspiel.GameType.RewardModel.TERMINAL)
     state: UmaState = game.new_initial_state()
     rng = np.random.RandomState(42)
     bot = mcts.MCTSBot(
