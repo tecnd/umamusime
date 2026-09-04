@@ -6,7 +6,7 @@ from open_spiel.python.pytorch import dqn
 
 from .umamusime import UmaGame
 
-_TRAINING_EPISODES = 2000
+_TRAINING_EPISODES = 600
 _EVAL_EVERY = 200
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
 
