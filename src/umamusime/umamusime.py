@@ -5,22 +5,31 @@ import pyspiel
 
 JsonDict = dict[str, Any]
 
-_GAME_TYPE = pyspiel.GameType(
-    short_name="umamusime",
-    long_name="Umamusime",
-    dynamics=pyspiel.GameType.Dynamics.SEQUENTIAL,
-    chance_mode=pyspiel.GameType.ChanceMode.EXPLICIT_STOCHASTIC,
-    information=pyspiel.GameType.Information.PERFECT_INFORMATION,
-    utility=pyspiel.GameType.Utility.GENERAL_SUM,
+
+def _make_game_type(
     reward_model=pyspiel.GameType.RewardModel.REWARDS,
-    max_num_players=1,
-    min_num_players=1,
-    provides_information_state_string=True,
-    provides_information_state_tensor=False,
-    provides_observation_string=True,
-    provides_observation_tensor=True,
-    parameter_specification={},
-)
+) -> pyspiel.GameType:
+    return pyspiel.GameType(
+        short_name="umamusime",
+        long_name="Umamusime",
+        dynamics=pyspiel.GameType.Dynamics.SEQUENTIAL,
+        chance_mode=pyspiel.GameType.ChanceMode.EXPLICIT_STOCHASTIC,
+        information=pyspiel.GameType.Information.PERFECT_INFORMATION,
+        utility=pyspiel.GameType.Utility.GENERAL_SUM,
+        reward_model=reward_model,
+        max_num_players=1,
+        min_num_players=1,
+        provides_information_state_string=True,
+        provides_information_state_tensor=False,
+        provides_observation_string=True,
+        provides_observation_tensor=True,
+        parameter_specification={},
+    )
+
+
+# Per-turn rewards are real (used by DQN). MCTSBot only checks this metadata
+# and can be given TERMINAL via UmaGame(reward_model=...).
+_GAME_TYPE = _make_game_type()
 
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
@@ -38,8 +47,11 @@ _STARTING_ENERGY = 100
 
 
 class UmaGame(pyspiel.Game):
-    def __init__(self, params=None):
-        super().__init__(_GAME_TYPE, _GAME_INFO, params or {})
+    def __init__(self, params=None, *, reward_model=None):
+        game_type = (
+            _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
+        )
+        super().__init__(game_type, _GAME_INFO, params or {})
 
     def new_initial_state(self, state=None):
         return UmaState(self, state)
