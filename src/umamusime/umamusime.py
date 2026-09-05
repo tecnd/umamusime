@@ -43,6 +43,20 @@ _GAME_INFO = pyspiel.GameInfo(
 # Score awarded per successful action, indexed by action id.
 _ACTION_REWARDS = (0.0, 3.0, 1.0, 1.0, 1.0, 1.5)
 
+# (speed, stamina, power, guts, wit) granted on a successful action.
+_ACTION_STATS = (
+    (0, 0, 0, 0, 0),
+    (10, 0, 5, 0, 0),
+    (0, 9, 0, 4, 0),
+    (0, 5, 0, 8, 0),
+    (4, 0, 4, 8, 0),
+    (2, 0, 0, 0, 9),
+)
+_MAX_STATS = tuple(
+    max(gains[i] for gains in _ACTION_STATS) * _GAME_INFO.max_game_length
+    for i in range(5)
+)
+
 # Energy change per action: rest, speed, stamina, power, guts, wit.
 _ENERGY_DELTA = (50, -20, -20, -20, -20, 5)
 _STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
@@ -152,21 +166,12 @@ class UmaState(pyspiel.State):
     def _apply_training_result(self, action: int, success: bool) -> None:
         if success:
             self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
-            match action:
-                case 0:
-                    pass
-                case 1:
-                    self._speed += 1
-                case 2:
-                    self._stamina += 1
-                case 3:
-                    self._power += 1
-                case 4:
-                    self._guts += 1
-                case 5:
-                    self._wit += 1
-                case _:
-                    raise ValueError(f"Invalid action: {action}")
+            speed, stamina, power, guts, wit = _ACTION_STATS[action]
+            self._speed += speed
+            self._stamina += stamina
+            self._power += power
+            self._guts += guts
+            self._wit += wit
             self._last_reward = _ACTION_REWARDS[action]
             self._score += self._last_reward
         else:
@@ -221,14 +226,13 @@ class UmaObserver:
     def set_from(self, state: UmaState, player):
         del player
         # Scaled to roughly [0, 1] so the values are usable as network inputs.
-        max_stat = _GAME_INFO.max_game_length
         self.tensor[:] = (
-            state._turn / max_stat,
-            state._speed / max_stat,
-            state._stamina / max_stat,
-            state._power / max_stat,
-            state._guts / max_stat,
-            state._wit / max_stat,
+            state._turn / _GAME_INFO.max_game_length,
+            state._speed / _MAX_STATS[0],
+            state._stamina / _MAX_STATS[1],
+            state._power / _MAX_STATS[2],
+            state._guts / _MAX_STATS[3],
+            state._wit / _MAX_STATS[4],
             state._energy / _STARTING_ENERGY,
         )
 
