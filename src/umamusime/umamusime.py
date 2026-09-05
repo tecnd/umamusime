@@ -33,17 +33,39 @@ _GAME_TYPE = _make_game_type()
 
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
-    max_chance_outcomes=3,
+    max_chance_outcomes=2,
     num_players=1,
     min_utility=0.0,
     max_utility=20000.0,
     max_game_length=60,
 )
 
-# Score awarded per action, indexed by action id.
+# Score awarded per successful action, indexed by action id.
 _ACTION_REWARDS = (0.0, 3.0, 1.0, 1.0, 1.0, 1.5)
 
-_STARTING_ENERGY = 100
+# Energy change per action: rest, speed, stamina, power, guts, wit.
+_ENERGY_DELTA = (50, -20, -20, -20, -20, 5)
+_STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
+
+_MAX_ENERGY = 100
+_STARTING_ENERGY = _MAX_ENERGY
+_FAIL_FREE_ENERGY = 50
+
+_CHANCE_FAIL = 0
+_CHANCE_SUCCESS = 1
+
+
+def _clip_energy(energy: int) -> int:
+    return max(0, min(_MAX_ENERGY, energy))
+
+
+def _stat_train_failure_chance(energy_after: int) -> float:
+    # Remaining energy >= 50 never fails; 0 always fails; linear in between.
+    if energy_after >= _FAIL_FREE_ENERGY:
+        return 0.0
+    if energy_after <= 0:
+        return 1.0
+    return (_FAIL_FREE_ENERGY - energy_after) / _FAIL_FREE_ENERGY
 
 
 class UmaGame(pyspiel.Game):
@@ -77,6 +99,7 @@ class UmaState(pyspiel.State):
 
         self._score = 0.0
         self._last_reward = 0.0
+        self._pending_action: int | None = None
 
     def current_player(self):
         if self._is_chance_node:
@@ -86,6 +109,14 @@ class UmaState(pyspiel.State):
         return 0
 
     def action_to_string(self, player, action):
+        if player == pyspiel.PlayerId.CHANCE:
+            match action:
+                case 0:
+                    return "fail"
+                case 1:
+                    return "success"
+                case _:
+                    raise ValueError(f"Invalid chance action: {action}")
         match action:
             case 0:
                 return "rest"
@@ -103,33 +134,62 @@ class UmaState(pyspiel.State):
                 raise ValueError(f"Invalid action: {action}")
 
     def legal_actions(self, player=None):
+        if self._is_chance_node:
+            return [_CHANCE_FAIL, _CHANCE_SUCCESS]
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
-    def apply_action(self, action):
-        match action:
-            case 0:
-                self._energy += 10
-            case 1:
-                self._speed += 1
-                self._energy = max(0, self._energy - 10)
-            case 2:
-                self._stamina += 1
-                self._energy = max(0, self._energy - 10)
-            case 3:
-                self._power += 1
-                self._energy = max(0, self._energy - 10)
-            case 4:
-                self._guts += 1
-                self._energy = max(0, self._energy - 10)
-            case 5:
-                self._wit += 1
-                self._energy = max(0, self._energy - 10)
-            case _:
-                raise ValueError(f"Invalid action: {action}")
+    def chance_outcomes(self):
+        assert self.is_chance_node()
+        p_fail = _stat_train_failure_chance(self._energy)
+        return [(_CHANCE_FAIL, p_fail), (_CHANCE_SUCCESS, 1.0 - p_fail)]
 
-        self._last_reward = _ACTION_REWARDS[action]
-        self._score += self._last_reward
+    def _apply_training_result(self, action: int, success: bool) -> None:
+        if success:
+            match action:
+                case 0:
+                    pass
+                case 1:
+                    self._speed += 1
+                case 2:
+                    self._stamina += 1
+                case 3:
+                    self._power += 1
+                case 4:
+                    self._guts += 1
+                case 5:
+                    self._wit += 1
+                case _:
+                    raise ValueError(f"Invalid action: {action}")
+            self._last_reward = _ACTION_REWARDS[action]
+            self._score += self._last_reward
+        else:
+            self._last_reward = 0.0
         self._turn += 1
+        self._pending_action = None
+        self._is_chance_node = False
+
+    def apply_action(self, action):
+        if self._is_chance_node:
+            assert self._pending_action is not None
+            self._apply_training_result(
+                self._pending_action, success=(action == _CHANCE_SUCCESS)
+            )
+            return
+
+        if action not in range(_GAME_INFO.num_distinct_actions):
+            raise ValueError(f"Invalid action: {action}")
+
+        self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
+        fail_p = (
+            _stat_train_failure_chance(self._energy)
+            if action in _STAT_TRAIN_ACTIONS
+            else 0.0
+        )
+        if 0.0 < fail_p < 1.0:
+            self._pending_action = action
+            self._is_chance_node = True
+            return
+        self._apply_training_result(action, success=(fail_p == 0.0))
 
     def is_terminal(self):
         return self._turn >= _GAME_INFO.max_game_length
