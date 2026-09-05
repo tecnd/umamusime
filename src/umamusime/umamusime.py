@@ -50,6 +50,7 @@ _STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
 _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
 _FAIL_FREE_ENERGY = 50
+_FAIL_CHANCE_AT_ZERO = 0.99
 
 _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
@@ -60,12 +61,15 @@ def _clip_energy(energy: int) -> int:
 
 
 def _stat_train_failure_chance(energy_after: int) -> float:
-    # Remaining energy >= 50 never fails; 0 always fails; linear in between.
+    # Remaining energy >= 50 never fails; 0 is 99% fail; linear in between.
     if energy_after >= _FAIL_FREE_ENERGY:
         return 0.0
-    if energy_after <= 0:
-        return 1.0
-    return (_FAIL_FREE_ENERGY - energy_after) / _FAIL_FREE_ENERGY
+    remaining = max(energy_after, 0)
+    return (
+        _FAIL_CHANCE_AT_ZERO
+        * (_FAIL_FREE_ENERGY - remaining)
+        / _FAIL_FREE_ENERGY
+    )
 
 
 class UmaGame(pyspiel.Game):
