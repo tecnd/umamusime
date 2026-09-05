@@ -52,10 +52,6 @@ _ACTION_STATS = (
     (4, 0, 4, 8, 0),
     (2, 0, 0, 0, 9),
 )
-_MAX_STATS = tuple(
-    max(gains[i] for gains in _ACTION_STATS) * _GAME_INFO.max_game_length
-    for i in range(5)
-)
 
 # (speed, stamina, power, guts, wit) applied when that training fails.
 _FAIL_STATS = (
@@ -73,6 +69,8 @@ _STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
 
 _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
+_MIN_STAT = 0
+_MAX_STAT = 1200
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
 
@@ -82,6 +80,10 @@ _CHANCE_SUCCESS = 1
 
 def _clip_energy(energy: int) -> int:
     return max(0, min(_MAX_ENERGY, energy))
+
+
+def _clip_stat(value: int) -> int:
+    return max(_MIN_STAT, min(_MAX_STAT, value))
 
 
 def _stat_train_failure_chance(energy_after: int) -> float:
@@ -182,11 +184,11 @@ class UmaState(pyspiel.State):
         else:
             speed, stamina, power, guts, wit = _FAIL_STATS[action]
             self._last_reward = 0.0
-        self._speed += speed
-        self._stamina += stamina
-        self._power += power
-        self._guts += guts
-        self._wit += wit
+        self._speed = _clip_stat(self._speed + speed)
+        self._stamina = _clip_stat(self._stamina + stamina)
+        self._power = _clip_stat(self._power + power)
+        self._guts = _clip_stat(self._guts + guts)
+        self._wit = _clip_stat(self._wit + wit)
         self._turn += 1
         self._pending_action = None
         self._is_chance_node = False
@@ -239,11 +241,11 @@ class UmaObserver:
         # Scaled to roughly [0, 1] so the values are usable as network inputs.
         self.tensor[:] = (
             state._turn / _GAME_INFO.max_game_length,
-            state._speed / _MAX_STATS[0],
-            state._stamina / _MAX_STATS[1],
-            state._power / _MAX_STATS[2],
-            state._guts / _MAX_STATS[3],
-            state._wit / _MAX_STATS[4],
+            state._speed / _MAX_STAT,
+            state._stamina / _MAX_STAT,
+            state._power / _MAX_STAT,
+            state._guts / _MAX_STAT,
+            state._wit / _MAX_STAT,
             state._energy / _STARTING_ENERGY,
         )
 
