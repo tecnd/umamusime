@@ -57,6 +57,16 @@ _MAX_STATS = tuple(
     for i in range(5)
 )
 
+# (speed, stamina, power, guts, wit) applied when that training fails.
+_FAIL_STATS = (
+    (0, 0, 0, 0, 0),
+    (-10, 0, 0, 0, 0),
+    (0, -10, 0, 0, 0),
+    (0, 0, -10, 0, 0),
+    (0, 0, 0, -10, 0),
+    (0, 0, 0, 0, 0),
+)
+
 # Energy change per action: rest, speed, stamina, power, guts, wit.
 _ENERGY_DELTA = (50, -20, -20, -20, -20, 5)
 _STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
@@ -167,15 +177,16 @@ class UmaState(pyspiel.State):
         if success:
             self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
             speed, stamina, power, guts, wit = _ACTION_STATS[action]
-            self._speed += speed
-            self._stamina += stamina
-            self._power += power
-            self._guts += guts
-            self._wit += wit
             self._last_reward = _ACTION_REWARDS[action]
             self._score += self._last_reward
         else:
+            speed, stamina, power, guts, wit = _FAIL_STATS[action]
             self._last_reward = 0.0
+        self._speed += speed
+        self._stamina += stamina
+        self._power += power
+        self._guts += guts
+        self._wit += wit
         self._turn += 1
         self._pending_action = None
         self._is_chance_node = False
