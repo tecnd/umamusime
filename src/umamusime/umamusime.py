@@ -140,11 +140,14 @@ class UmaState(pyspiel.State):
 
     def chance_outcomes(self):
         assert self.is_chance_node()
-        p_fail = _stat_train_failure_chance(self._energy)
+        assert self._pending_action is not None
+        energy_after = _clip_energy(self._energy + _ENERGY_DELTA[self._pending_action])
+        p_fail = _stat_train_failure_chance(energy_after)
         return [(_CHANCE_FAIL, p_fail), (_CHANCE_SUCCESS, 1.0 - p_fail)]
 
     def _apply_training_result(self, action: int, success: bool) -> None:
         if success:
+            self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
             match action:
                 case 0:
                     pass
@@ -179,9 +182,9 @@ class UmaState(pyspiel.State):
         if action not in range(_GAME_INFO.num_distinct_actions):
             raise ValueError(f"Invalid action: {action}")
 
-        self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
+        energy_after = _clip_energy(self._energy + _ENERGY_DELTA[action])
         fail_p = (
-            _stat_train_failure_chance(self._energy)
+            _stat_train_failure_chance(energy_after)
             if action in _STAT_TRAIN_ACTIONS
             else 0.0
         )
