@@ -33,17 +33,69 @@ _GAME_TYPE = _make_game_type()
 
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
-    max_chance_outcomes=3,
+    max_chance_outcomes=2,
     num_players=1,
     min_utility=0.0,
     max_utility=20000.0,
     max_game_length=60,
 )
 
-# Score awarded per action, indexed by action id.
+# Score awarded per successful action, indexed by action id.
 _ACTION_REWARDS = (0.0, 3.0, 1.0, 1.0, 1.0, 1.5)
 
-_STARTING_ENERGY = 100
+# (speed, stamina, power, guts, wit) granted on a successful action.
+_ACTION_STATS = (
+    (0, 0, 0, 0, 0),
+    (10, 0, 5, 0, 0),
+    (0, 9, 0, 4, 0),
+    (0, 5, 0, 8, 0),
+    (4, 0, 4, 8, 0),
+    (2, 0, 0, 0, 9),
+)
+
+# (speed, stamina, power, guts, wit) applied when that training fails.
+_FAIL_STATS = (
+    (0, 0, 0, 0, 0),
+    (-10, 0, 0, 0, 0),
+    (0, -10, 0, 0, 0),
+    (0, 0, -10, 0, 0),
+    (0, 0, 0, -10, 0),
+    (0, 0, 0, 0, 0),
+)
+
+# Energy change per action: rest, speed, stamina, power, guts, wit.
+_ENERGY_DELTA = (50, -20, -20, -20, -20, 5)
+_STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
+
+_MAX_ENERGY = 100
+_STARTING_ENERGY = _MAX_ENERGY
+_MIN_STAT = 0
+_MAX_STAT = 1200
+_FAIL_FREE_ENERGY = 50
+_FAIL_CHANCE_AT_ZERO = 0.99
+
+_CHANCE_FAIL = 0
+_CHANCE_SUCCESS = 1
+
+
+def _clip_energy(energy: int) -> int:
+    return max(0, min(_MAX_ENERGY, energy))
+
+
+def _clip_stat(value: int) -> int:
+    return max(_MIN_STAT, min(_MAX_STAT, value))
+
+
+def _stat_train_failure_chance(energy_after: int) -> float:
+    # Remaining energy >= 50 never fails; 0 is 99% fail; linear in between.
+    if energy_after >= _FAIL_FREE_ENERGY:
+        return 0.0
+    remaining = max(energy_after, 0)
+    return (
+        _FAIL_CHANCE_AT_ZERO
+        * (_FAIL_FREE_ENERGY - remaining)
+        / _FAIL_FREE_ENERGY
+    )
 
 
 class UmaGame(pyspiel.Game):
@@ -77,6 +129,7 @@ class UmaState(pyspiel.State):
 
         self._score = 0.0
         self._last_reward = 0.0
+        self._pending_action: int | None = None
 
     def current_player(self):
         if self._is_chance_node:
@@ -86,6 +139,14 @@ class UmaState(pyspiel.State):
         return 0
 
     def action_to_string(self, player, action):
+        if player == pyspiel.PlayerId.CHANCE:
+            match action:
+                case 0:
+                    return "fail"
+                case 1:
+                    return "success"
+                case _:
+                    raise ValueError(f"Invalid chance action: {action}")
         match action:
             case 0:
                 return "rest"
@@ -103,33 +164,57 @@ class UmaState(pyspiel.State):
                 raise ValueError(f"Invalid action: {action}")
 
     def legal_actions(self, player=None):
+        if self._is_chance_node:
+            return [_CHANCE_FAIL, _CHANCE_SUCCESS]
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
-    def apply_action(self, action):
-        match action:
-            case 0:
-                self._energy += 10
-            case 1:
-                self._speed += 1
-                self._energy = max(0, self._energy - 10)
-            case 2:
-                self._stamina += 1
-                self._energy = max(0, self._energy - 10)
-            case 3:
-                self._power += 1
-                self._energy = max(0, self._energy - 10)
-            case 4:
-                self._guts += 1
-                self._energy = max(0, self._energy - 10)
-            case 5:
-                self._wit += 1
-                self._energy = max(0, self._energy - 10)
-            case _:
-                raise ValueError(f"Invalid action: {action}")
+    def chance_outcomes(self):
+        assert self.is_chance_node()
+        assert self._pending_action is not None
+        energy_after = _clip_energy(self._energy + _ENERGY_DELTA[self._pending_action])
+        p_fail = _stat_train_failure_chance(energy_after)
+        return [(_CHANCE_FAIL, p_fail), (_CHANCE_SUCCESS, 1.0 - p_fail)]
 
-        self._last_reward = _ACTION_REWARDS[action]
-        self._score += self._last_reward
+    def _apply_training_result(self, action: int, success: bool) -> None:
+        if success:
+            self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
+            speed, stamina, power, guts, wit = _ACTION_STATS[action]
+            self._last_reward = _ACTION_REWARDS[action]
+            self._score += self._last_reward
+        else:
+            speed, stamina, power, guts, wit = _FAIL_STATS[action]
+            self._last_reward = 0.0
+        self._speed = _clip_stat(self._speed + speed)
+        self._stamina = _clip_stat(self._stamina + stamina)
+        self._power = _clip_stat(self._power + power)
+        self._guts = _clip_stat(self._guts + guts)
+        self._wit = _clip_stat(self._wit + wit)
         self._turn += 1
+        self._pending_action = None
+        self._is_chance_node = False
+
+    def apply_action(self, action):
+        if self._is_chance_node:
+            assert self._pending_action is not None
+            self._apply_training_result(
+                self._pending_action, success=(action == _CHANCE_SUCCESS)
+            )
+            return
+
+        if action not in range(_GAME_INFO.num_distinct_actions):
+            raise ValueError(f"Invalid action: {action}")
+
+        energy_after = _clip_energy(self._energy + _ENERGY_DELTA[action])
+        fail_p = (
+            _stat_train_failure_chance(energy_after)
+            if action in _STAT_TRAIN_ACTIONS
+            else 0.0
+        )
+        if 0.0 < fail_p < 1.0:
+            self._pending_action = action
+            self._is_chance_node = True
+            return
+        self._apply_training_result(action, success=(fail_p == 0.0))
 
     def is_terminal(self):
         return self._turn >= _GAME_INFO.max_game_length
@@ -154,14 +239,13 @@ class UmaObserver:
     def set_from(self, state: UmaState, player):
         del player
         # Scaled to roughly [0, 1] so the values are usable as network inputs.
-        max_stat = _GAME_INFO.max_game_length
         self.tensor[:] = (
-            state._turn / max_stat,
-            state._speed / max_stat,
-            state._stamina / max_stat,
-            state._power / max_stat,
-            state._guts / max_stat,
-            state._wit / max_stat,
+            state._turn / _GAME_INFO.max_game_length,
+            state._speed / _MAX_STAT,
+            state._stamina / _MAX_STAT,
+            state._power / _MAX_STAT,
+            state._guts / _MAX_STAT,
+            state._wit / _MAX_STAT,
             state._energy / _STARTING_ENERGY,
         )
 
