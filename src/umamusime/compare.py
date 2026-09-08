@@ -44,7 +44,7 @@ def summarize_strategy(actions: list[int]) -> str:
 def _report(name: str, state: UmaState, actions: list[int]) -> None:
     print(f"=== {name} ===")
     print(f"Final state: {state}")
-    print(f"Reward: {state.returns()[0]}")
+    print(f"Reward: {state.returns()[0]:.1f}")
     print(f"Strategy: {summarize_strategy(actions)}")
     print()
 
