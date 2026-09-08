@@ -36,6 +36,8 @@ def summarize_strategy(actions: list[int]) -> str:
     if rest:
         rest_word = "time" if rest == 1 else "times"
         return f"The policy {train_txt}, resting {rest} {rest_word} to recover energy."
+    if extras:
+        return f"The policy {train_txt}, without resting."
     return f"The policy {train_txt} without resting."
 
 
