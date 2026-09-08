@@ -43,6 +43,11 @@ _GAME_INFO = pyspiel.GameInfo(
 # Score awarded per successful action, indexed by action id.
 _ACTION_REWARDS = (0.0, 3.0, 1.0, 1.0, 1.0, 1.5)
 
+# Skill points granted on a successful action: rest, speed, stamina, power,
+# guts, wit. There is no dedicated skill-point training.
+_ACTION_SKILL_POINTS = (0, 2, 2, 2, 2, 4)
+_SKILL_POINT_WEIGHT = 0.9
+
 # (speed, stamina, power, guts, wit) granted on a successful action.
 _ACTION_STATS = (
     (0, 0, 0, 0, 0),
@@ -71,6 +76,8 @@ _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
 _MIN_STAT = 0
 _MAX_STAT = 1200
+# Skill points are uncapped; this is only used to scale the observation.
+_SKILL_POINT_OBS_SCALE = max(_ACTION_SKILL_POINTS) * _GAME_INFO.max_game_length
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
 
@@ -125,6 +132,7 @@ class UmaState(pyspiel.State):
         self._power = 0
         self._guts = 0
         self._wit = 0
+        self._skill_points = 0
         self._energy = _STARTING_ENERGY
 
         self._score = 0.0
@@ -179,7 +187,11 @@ class UmaState(pyspiel.State):
         if success:
             self._energy = _clip_energy(self._energy + _ENERGY_DELTA[action])
             speed, stamina, power, guts, wit = _ACTION_STATS[action]
-            self._last_reward = _ACTION_REWARDS[action]
+            skill_points = _ACTION_SKILL_POINTS[action]
+            self._skill_points += skill_points
+            self._last_reward = (
+                _ACTION_REWARDS[action] + _SKILL_POINT_WEIGHT * skill_points
+            )
             self._score += self._last_reward
         else:
             speed, stamina, power, guts, wit = _FAIL_STATS[action]
@@ -226,14 +238,18 @@ class UmaState(pyspiel.State):
         return [self._score]
 
     def __str__(self):
-        return f"Turn: {self._turn}, Speed: {self._speed}, Stamina: {self._stamina}, Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, Energy: {self._energy}"
+        return (
+            f"Turn: {self._turn}, Speed: {self._speed}, Stamina: {self._stamina}, "
+            f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
+            f"Skill points: {self._skill_points}, Energy: {self._energy}"
+        )
 
 
 class UmaObserver:
     def __init__(self, params=None):
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}")
-        self.tensor = np.zeros(7, np.float32)
+        self.tensor = np.zeros(8, np.float32)
         self.dict = {"observation": self.tensor}
 
     def set_from(self, state: UmaState, player):
@@ -246,6 +262,7 @@ class UmaObserver:
             state._power / _MAX_STAT,
             state._guts / _MAX_STAT,
             state._wit / _MAX_STAT,
+            state._skill_points / _SKILL_POINT_OBS_SCALE,
             state._energy / _STARTING_ENERGY,
         )
 
