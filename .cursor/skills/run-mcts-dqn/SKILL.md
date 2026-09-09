@@ -18,8 +18,10 @@ uv run python -m umamusime.compare
 2. The command trains DQN if `dqn_checkpoint.pt` is missing (then saves it), plays one MCTS game and one greedy DQN game, and prints for each method:
    - Final state
    - Reward
-   - One sentence summarizing the chosen rest/training strategy
+   - Actions, in order, named with `state.action_to_string`
 
-3. Show that output to the user without re-running the play loops yourself.
+3. For each method, write **one sentence** summarizing the chosen rest/training strategy from that action sequence. Do not count actions programmatically or reuse a canned template.
+
+4. Show the user each method's final state, reward, and your one-sentence summary. Do not re-run the play loops.
 
 Do not reimplement MCTS or DQN. `umamusime.compare` calls `umamusime.mcts.play` and `umamusime.dqn.play`.
