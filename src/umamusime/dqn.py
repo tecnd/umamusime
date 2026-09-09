@@ -4,7 +4,7 @@ import torch
 from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import dqn
 
-from .umamusime import UmaGame
+from .umamusime import UmaGame, UmaState
 
 _TRAINING_EPISODES = 600
 _EVAL_EVERY = 200
@@ -25,17 +25,7 @@ def _save(agent: dqn.DQN, path: pathlib.Path) -> None:
     )
 
 
-def _eval_return(env: rl_environment.Environment, agent: dqn.DQN) -> float:
-    time_step = env.reset()
-    total = 0.0
-    while not time_step.last():
-        agent_output = agent.step(time_step, is_evaluation=True)
-        time_step = env.step([agent_output.action])
-        total += time_step.rewards[0]
-    return total
-
-
-def main() -> None:
+def _make_env_and_agent() -> tuple[rl_environment.Environment, dqn.DQN]:
     env = rl_environment.Environment(UmaGame())
     agent = dqn.DQN(
         player_id=0,
@@ -48,32 +38,65 @@ def main() -> None:
         optimizer_str=dqn.Optimiser.ADAM,
         epsilon_decay_duration=_TRAINING_EPISODES * 60 // 2,
     )
+    return env, agent
 
-    if _CHECKPOINT.exists():
-        agent.load(_CHECKPOINT)
-        print(f"Loaded {_CHECKPOINT}, skipping training")
-    else:
-        for episode in range(_TRAINING_EPISODES):
-            time_step = env.reset()
-            while not time_step.last():
-                agent_output = agent.step(time_step)
-                time_step = env.step([agent_output.action])
-            agent.step(time_step)
-            if (episode + 1) % _EVAL_EVERY == 0:
-                print(
-                    f"Episode {episode + 1}, loss {agent.loss}, "
-                    f"greedy return {_eval_return(env, agent)}"
-                )
-        _save(agent, _CHECKPOINT)
-        print(f"Saved {_CHECKPOINT}")
 
+def _eval_return(env: rl_environment.Environment, agent: dqn.DQN) -> float:
     time_step = env.reset()
+    total = 0.0
     while not time_step.last():
         agent_output = agent.step(time_step, is_evaluation=True)
-        print(env.get_state.action_to_string(0, agent_output.action))
         time_step = env.step([agent_output.action])
-    print(env.get_state)
-    print(f"Returns: {env.get_state.returns()}")
+        total += time_step.rewards[0]
+    return total
+
+
+def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> None:
+    for episode in range(_TRAINING_EPISODES):
+        time_step = env.reset()
+        while not time_step.last():
+            agent_output = agent.step(time_step)
+            time_step = env.step([agent_output.action])
+        agent.step(time_step)
+        if log and (episode + 1) % _EVAL_EVERY == 0:
+            print(
+                f"Episode {episode + 1}, loss {agent.loss}, "
+                f"greedy return {_eval_return(env, agent)}"
+            )
+
+
+def play(
+    *, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT
+) -> tuple[UmaState, list[int]]:
+    env, agent = _make_env_and_agent()
+    if checkpoint.exists():
+        agent.load(checkpoint)
+        if verbose:
+            print(f"Loaded {checkpoint}, skipping training")
+    else:
+        _train(env, agent, log=verbose)
+        _save(agent, checkpoint)
+        if verbose:
+            print(f"Saved {checkpoint}")
+
+    time_step = env.reset()
+    actions: list[int] = []
+    while not time_step.last():
+        agent_output = agent.step(time_step, is_evaluation=True)
+        action = int(agent_output.action)
+        actions.append(action)
+        if verbose:
+            print(env.get_state.action_to_string(0, action))
+        time_step = env.step([action])
+    state: UmaState = env.get_state
+    if verbose:
+        print(state)
+        print(f"Returns: {state.returns()}")
+    return state, actions
+
+
+def main() -> None:
+    play(verbose=True)
 
 
 if __name__ == "__main__":
