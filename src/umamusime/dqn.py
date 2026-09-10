@@ -66,7 +66,10 @@ def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> Non
 
 
 def play(
-    *, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT
+    *,
+    verbose: bool = True,
+    checkpoint: pathlib.Path = _CHECKPOINT,
+    seed: int | None = None,
 ) -> tuple[UmaState, list[int]]:
     env, agent = _make_env_and_agent()
     if checkpoint.exists():
@@ -79,6 +82,9 @@ def play(
         if verbose:
             print(f"Saved {checkpoint}")
 
+    # Seed only the evaluation episode so training stays independent of it.
+    if seed is not None:
+        env.seed(seed)
     time_step = env.reset()
     actions: list[int] = []
     while not time_step.last():
