@@ -31,13 +31,31 @@ def _make_game_type(
 # and can be given TERMINAL via UmaGame(reward_model=...).
 _GAME_TYPE = _make_game_type()
 
+# 3 years × 12 months × 2 half-months.
+_MAX_TURNS = 72
+_TURNS_PER_YEAR = 24
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
     max_chance_outcomes=2,
     num_players=1,
     min_utility=0.0,
     max_utility=20000.0,
-    max_game_length=60,
+    max_game_length=_MAX_TURNS,
 )
 
 # Score awarded per successful action, indexed by action id.
@@ -83,6 +101,18 @@ _FAIL_CHANCE_AT_ZERO = 0.99
 
 _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
+
+
+def calendar_label(turn_1based: int) -> str:
+    """Calendar date for a 1-based turn in 1..72.
+
+    Turn 1 is Year 1, Early January; turn 72 is Year 3, Late December.
+    """
+    index = turn_1based - 1
+    year = index // _TURNS_PER_YEAR + 1
+    month = _MONTHS[(index % _TURNS_PER_YEAR) // 2]
+    half = "Early" if index % 2 == 0 else "Late"
+    return f"Year {year}, {half} {month}"
 
 
 def _clip_energy(energy: int) -> int:
@@ -231,6 +261,11 @@ class UmaState(pyspiel.State):
     def is_terminal(self):
         return self._turn >= _GAME_INFO.max_game_length
 
+    def _current_turn_1based(self) -> int:
+        if self._turn >= _MAX_TURNS:
+            return _MAX_TURNS
+        return self._turn + 1
+
     def rewards(self):
         return [self._last_reward]
 
@@ -239,7 +274,8 @@ class UmaState(pyspiel.State):
 
     def __str__(self):
         return (
-            f"Turn: {self._turn}, Speed: {self._speed}, Stamina: {self._stamina}, "
+            f"{calendar_label(self._current_turn_1based())}, "
+            f"Speed: {self._speed}, Stamina: {self._stamina}, "
             f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
             f"Skill points: {self._skill_points}, Energy: {self._energy}"
         )
