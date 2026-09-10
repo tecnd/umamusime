@@ -48,6 +48,8 @@ _MONTHS = (
     "November",
     "December",
 )
+_SUMMER_CAMP_YEARS = frozenset({2, 3})
+_SUMMER_CAMP_MONTHS = frozenset({"July", "August"})
 
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
@@ -103,16 +105,27 @@ _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
 
 
+def _calendar_parts(turn_1based: int) -> tuple[int, str, str]:
+    index = turn_1based - 1
+    year = index // _TURNS_PER_YEAR + 1
+    month = _MONTHS[(index % _TURNS_PER_YEAR) // 2]
+    half = "Early" if index % 2 == 0 else "Late"
+    return year, month, half
+
+
 def calendar_label(turn_1based: int) -> str:
     """Calendar date for a 1-based turn in 1..72.
 
     Turn 1 is Year 1, Early January; turn 72 is Year 3, Late December.
     """
-    index = turn_1based - 1
-    year = index // _TURNS_PER_YEAR + 1
-    month = _MONTHS[(index % _TURNS_PER_YEAR) // 2]
-    half = "Early" if index % 2 == 0 else "Late"
+    year, month, half = _calendar_parts(turn_1based)
     return f"Year {year}, {half} {month}"
+
+
+def _is_summer_camp_turn(turn_1based: int) -> bool:
+    # Years 2–3, Early July through Late August inclusive.
+    year, month, _half = _calendar_parts(turn_1based)
+    return year in _SUMMER_CAMP_YEARS and month in _SUMMER_CAMP_MONTHS
 
 
 def _clip_energy(energy: int) -> int:
@@ -265,6 +278,9 @@ class UmaState(pyspiel.State):
         if self._turn >= _MAX_TURNS:
             return _MAX_TURNS
         return self._turn + 1
+
+    def is_summer_camp(self) -> bool:
+        return _is_summer_camp_turn(self._current_turn_1based())
 
     def rewards(self):
         return [self._last_reward]
