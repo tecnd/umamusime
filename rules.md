@@ -2,7 +2,7 @@
 
 Single-player, 72 turns (3 years). Each turn is half a month: turn 1 is Year 1, Early January and turn 72 is Year 3, Late December. You start at 100 energy with all stats and skill points at 0. The score is the sum of per-turn rewards from **successful** actions, including 0.9 per skill point gained.
 
-In years 2 and 3, Early July through Late August (inclusive) are summer camp turns.
+In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses.
 
 Each stat (speed, stamina, power, guts, wit) is clipped to `[0, 1200]`. Energy is clipped to `[0, 100]`. Skill points are not capped. There is no dedicated skill-point training.
 

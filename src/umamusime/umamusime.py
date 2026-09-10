@@ -271,8 +271,13 @@ class UmaState(pyspiel.State):
             return [_CHANCE_FAIL, _CHANCE_SUCCESS]
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
-    def _facility_level_for(self, action: int) -> int:
+    def _permanent_facility_level_for(self, action: int) -> int:
         return _facility_level(self._facility_uses[action - 1])
+
+    def _facility_level_for(self, action: int) -> int:
+        if self.is_summer_camp():
+            return _MAX_FACILITY_LEVEL
+        return self._permanent_facility_level_for(action)
 
     def _energy_delta(self, action: int) -> int:
         level = 1 if action == 0 else self._facility_level_for(action)
