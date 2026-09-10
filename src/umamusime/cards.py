@@ -1,5 +1,5 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 # Stat order used by every stat tuple in the game. Skill points are a stat:
 # they take stat bonuses and the training multiplier like the rest.

@@ -557,7 +557,7 @@ class UmaState(pyspiel.State):
         return ", ".join(parts) if parts else "unrolled"
 
     def __str__(self):
-        lines = [
+        career = (
             f"{calendar_label(self._current_turn_1based())}, "
             f"Speed: {self._speed}, Stamina: {self._stamina}, "
             f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
@@ -566,9 +566,9 @@ class UmaState(pyspiel.State):
             f"stamina {self._facility_level_for(2)}, "
             f"power {self._facility_level_for(3)}, "
             f"guts {self._facility_level_for(4)}, "
-            f"wit {self._facility_level_for(5)}",
-            f"Friendship: {self._friendship_string()}",
-        ]
+            f"wit {self._facility_level_for(5)}"
+        )
+        lines = [career, f"Friendship: {self._friendship_string()}"]
         if not self.is_terminal():
             lines.append(f"Supports: {self._placement_string()}")
         return "\n".join(lines)
