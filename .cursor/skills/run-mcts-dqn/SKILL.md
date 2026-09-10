@@ -5,7 +5,7 @@ description: Run both MCTS and DQN on Umamusime, print each method's final state
 
 # Run MCTS and DQN
 
-Compare MCTS search and DQN on a full 60-turn Umamusime game.
+Compare MCTS search and DQN on a full 72-turn (3-year) Umamusime game.
 
 ## Instructions
 

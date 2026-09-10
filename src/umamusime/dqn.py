@@ -4,7 +4,7 @@ import torch
 from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import dqn
 
-from .umamusime import UmaGame, UmaState
+from .umamusime import UmaGame, UmaState, _MAX_TURNS
 
 _TRAINING_EPISODES = 600
 _EVAL_EVERY = 200
@@ -36,7 +36,7 @@ def _make_env_and_agent() -> tuple[rl_environment.Environment, dqn.DQN]:
         batch_size=128,
         learning_rate=0.01,
         optimizer_str=dqn.Optimiser.ADAM,
-        epsilon_decay_duration=_TRAINING_EPISODES * 60 // 2,
+        epsilon_decay_duration=_TRAINING_EPISODES * _MAX_TURNS // 2,
     )
     return env, agent
 
