@@ -1,3 +1,4 @@
+import time
 from collections.abc import Callable
 
 from . import dqn, mcts
@@ -44,10 +45,22 @@ def _report(
 
 def main() -> None:
     print("Deck: " + ", ".join(card.name for card in UmaGame().cards) + "\n")
-    mcts_state, mcts_actions, mcts_scores, mcts_best = _best_of(
-        lambda index: mcts.play(verbose=False, seed=_SEED + index)
-    )
+
+    mcts_run_s: list[float] = []
+
+    def play_mcts(index: int) -> tuple[UmaState, list[int]]:
+        started = time.perf_counter()
+        result = mcts.play(verbose=False, seed=_SEED + index)
+        if index == 0:
+            mcts_run_s.append(time.perf_counter() - started)
+        return result
+
+    mcts_state, mcts_actions, mcts_scores, mcts_best = _best_of(play_mcts)
+    print(f"MCTS one run: {mcts_run_s[0]:.1f}s")
     _report("MCTS", mcts_state, mcts_actions, mcts_scores, mcts_best)
+
+    train_s = dqn.train(verbose=False)
+    print(f"DQN train time: {train_s:.1f}s")
     dqn_state, dqn_actions, dqn_scores, dqn_best = _best_of(
         lambda index: dqn.play(verbose=False, seed=_SEED + index)
     )

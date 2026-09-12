@@ -15,7 +15,9 @@ Compare MCTS search and DQN on a full 72-turn (3-year) Umamusime game.
 uv run python -m umamusime.compare
 ```
 
-2. The command trains DQN if `dqn_checkpoint.pt` is missing (then saves it), plays **3** MCTS games and **3** greedy DQN games, and prints for each method:
+2. The command **always retrains DQN from scratch** (it does not reuse `dqn_checkpoint.pt`), plays **3** MCTS games and **3** greedy DQN games, and prints:
+   - How long **one** MCTS run took
+   - How long DQN **training** took
    - The reward of every run, and which run was best
    - Final state of the **best** (highest-reward) run
    - Reward of that best run
@@ -23,6 +25,6 @@ uv run python -m umamusime.compare
 
 3. For each method, write **one sentence** summarizing the chosen rest/training strategy from that **best** run's action sequence. Do not count actions programmatically or reuse a canned template. Do not summarize the discarded runs.
 
-4. Show the user each method's run rewards, the best run's final state and reward, and your one-sentence summary. Do not re-run the play loops.
+4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, and your one-sentence summary. Do not re-run the play loops.
 
-Do not reimplement MCTS or DQN. `umamusime.compare` calls `umamusime.mcts.play` and `umamusime.dqn.play`.
+Do not reimplement MCTS or DQN. `umamusime.compare` calls `umamusime.mcts.play`, `umamusime.dqn.train`, and `umamusime.dqn.play`.
