@@ -1,5 +1,6 @@
 import math
 from collections.abc import Sequence
+from enum import IntEnum, auto
 from typing import Any
 
 import numpy as np
@@ -174,9 +175,10 @@ _FAIL_CHANCE_AT_ZERO = 0.99
 _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
 
-_PHASE_PLACEMENT = 0
-_PHASE_DECISION = 1
-_PHASE_RESULT = 2
+class _Phase(IntEnum):
+    PLACEMENT = auto()
+    DECISION = auto()
+    RESULT = auto()
 
 
 def _calendar_parts(turn_1based: int) -> tuple[int, str, str]:
@@ -340,7 +342,7 @@ class UmaState(pyspiel.State):
         self._friendship = tuple(card.initial_friendship for card in game.cards)
         self._placements = (_PLACEMENT_AWAY,) * _NUM_CARDS
         self._placement_index = 0
-        self._phase = _PHASE_PLACEMENT
+        self._phase = _Phase.PLACEMENT
 
         self._score = 0.0
         self._last_reward = 0.0
@@ -349,13 +351,13 @@ class UmaState(pyspiel.State):
     def current_player(self):
         if self.is_terminal():
             return pyspiel.PlayerId.TERMINAL
-        if self._phase == _PHASE_DECISION:
+        if self._phase == _Phase.DECISION:
             return 0
         return pyspiel.PlayerId.CHANCE
 
     def action_to_string(self, player, action):
         if player == pyspiel.PlayerId.CHANCE:
-            if self._phase == _PHASE_PLACEMENT:
+            if self._phase == _Phase.PLACEMENT:
                 card = self.get_game().cards[self._placement_index]
                 where = (
                     "away"
@@ -387,9 +389,9 @@ class UmaState(pyspiel.State):
                 raise ValueError(f"Invalid action: {action}")
 
     def legal_actions(self, player=None):
-        if self._phase == _PHASE_PLACEMENT:
+        if self._phase == _Phase.PLACEMENT:
             return list(range(_NUM_PLACEMENT_OUTCOMES))
-        if self._phase == _PHASE_RESULT:
+        if self._phase == _Phase.RESULT:
             return [_CHANCE_FAIL, _CHANCE_SUCCESS]
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
@@ -466,7 +468,7 @@ class UmaState(pyspiel.State):
 
     def chance_outcomes(self):
         assert self.is_chance_node()
-        if self._phase == _PHASE_PLACEMENT:
+        if self._phase == _Phase.PLACEMENT:
             return self.get_game().placement_outcomes[self._placement_index]
         assert self._pending_action is not None
         energy_after = _clip_energy(
@@ -527,10 +529,10 @@ class UmaState(pyspiel.State):
     def _begin_turn(self) -> None:
         self._placements = (_PLACEMENT_AWAY,) * _NUM_CARDS
         self._placement_index = 0
-        self._phase = _PHASE_PLACEMENT
+        self._phase = _Phase.PLACEMENT
 
     def apply_action(self, action):
-        if self._phase == _PHASE_PLACEMENT:
+        if self._phase == _Phase.PLACEMENT:
             if action not in range(_NUM_PLACEMENT_OUTCOMES):
                 raise ValueError(f"Invalid placement outcome: {action}")
             placements = list(self._placements)
@@ -538,10 +540,10 @@ class UmaState(pyspiel.State):
             self._placements = tuple(placements)
             self._placement_index += 1
             if self._placement_index == _NUM_CARDS:
-                self._phase = _PHASE_DECISION
+                self._phase = _Phase.DECISION
             return
 
-        if self._phase == _PHASE_RESULT:
+        if self._phase == _Phase.RESULT:
             assert self._pending_action is not None
             self._apply_training_result(
                 self._pending_action, success=(action == _CHANCE_SUCCESS)
@@ -559,7 +561,7 @@ class UmaState(pyspiel.State):
         )
         if 0.0 < fail_p < 1.0:
             self._pending_action = action
-            self._phase = _PHASE_RESULT
+            self._phase = _Phase.RESULT
             return
         self._apply_training_result(action, success=(fail_p == 0.0))
 
