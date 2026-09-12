@@ -1,11 +1,11 @@
 ---
-name: run-mcts-dqn
-description: Run both MCTS and DQN on Umamusime, print each method's final state and reward, and give a one-sentence summary of the chosen strategy. Use when comparing MCTS and DQN, running both agents, or asking which training strategy each method chose.
+name: benchmark
+description: Run Random, MCTS, and DQN on Umamusime, print each method's final state and reward, and give a one-sentence summary of the chosen strategy. Use when benchmarking agents, comparing Random, MCTS, and DQN, or asking which training strategy each method chose.
 ---
 
-# Run MCTS and DQN
+# Benchmark Random, MCTS, and DQN
 
-Compare MCTS search and DQN on a full 72-turn (3-year) Umamusime game.
+Compare OpenSpiel's uniform random bot, MCTS search, and DQN on a full 72-turn (3-year) Umamusime game.
 
 ## Instructions
 
@@ -15,7 +15,7 @@ Compare MCTS search and DQN on a full 72-turn (3-year) Umamusime game.
 uv run python -m umamusime.compare
 ```
 
-2. The command **always retrains DQN from scratch** (it does not reuse `dqn_checkpoint.pt`), plays **3** MCTS games and **3** greedy DQN games, and prints:
+2. The command **always retrains DQN from scratch** (it does not reuse `dqn_checkpoint.pt`), plays **3** games for each of Random, MCTS, and greedy DQN, and prints:
    - How long **one** MCTS run took
    - How long DQN **training** took
    - The reward of every run, and which run was best
@@ -27,4 +27,4 @@ uv run python -m umamusime.compare
 
 4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, and your one-sentence summary. Do not re-run the play loops.
 
-Do not reimplement MCTS or DQN. `umamusime.compare` calls `umamusime.mcts.play`, `umamusime.dqn.train`, and `umamusime.dqn.play`.
+Do not reimplement the bots. `umamusime.compare` calls `umamusime.random_bot.play` (OpenSpiel `UniformRandomBot`), `umamusime.mcts.play`, `umamusime.dqn.train`, and `umamusime.dqn.play`.
