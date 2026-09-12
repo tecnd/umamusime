@@ -1,7 +1,12 @@
-from typing import Any
+import math
+from collections.abc import Sequence
+from enum import IntEnum, auto
+from typing import Any, NamedTuple
 
 import numpy as np
 import pyspiel
+
+from .cards import STATS, SupportCard, cards_from_param, deck_param
 
 JsonDict = dict[str, Any]
 
@@ -23,7 +28,7 @@ def _make_game_type(
         provides_information_state_tensor=False,
         provides_observation_string=True,
         provides_observation_tensor=True,
-        parameter_specification={},
+        parameter_specification={"cards": deck_param()},
     )
 
 
@@ -51,61 +56,67 @@ _MONTHS = (
 _SUMMER_CAMP_YEARS = frozenset({2, 3})
 _SUMMER_CAMP_MONTHS = frozenset({"July", "August"})
 
+_NUM_STATS = len(STATS)
+_STAT_INDEX = {stat: index for index, stat in enumerate(STATS)}
+_NUM_CARDS = 6
+# Support cards attend one of the five training facilities, or nobody's.
+_PLACEMENT_AWAY = 0
+_NUM_PLACEMENT_OUTCOMES = 6
+
+# A turn is six placement rolls, the player's action, then a fail/success roll.
+_NODES_PER_TURN = _NUM_CARDS + 2
+
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=6,
-    max_chance_outcomes=2,
+    max_chance_outcomes=_NUM_PLACEMENT_OUTCOMES,
     num_players=1,
-    min_utility=0.0,
-    max_utility=20000.0,
-    max_game_length=_MAX_TURNS,
+    min_utility=-5000.0,
+    max_utility=50000.0,
+    max_game_length=_MAX_TURNS * _NODES_PER_TURN,
 )
 
-# Score awarded per successful action, indexed by action id.
-_ACTION_REWARDS = (0.0, 3.0, 1.0, 1.0, 1.0, 1.5)
-
-# Skill points granted on a successful action: rest, speed, stamina, power,
-# guts, wit. There is no dedicated skill-point training.
-_ACTION_SKILL_POINTS = (0, 2, 2, 2, 2, 4)
-_SKILL_POINT_WEIGHT = 0.9
+# Score per point of (speed, stamina, power, guts, wit, skill points) gained.
+_STAT_WEIGHTS = (3.0, 1.0, 1.0, 1.0, 1.5, 0.9)
 
 # Facility levels 1–5. Rest is not a facility; its row is unused.
-# Each entry is (speed, stamina, power, guts, wit) on a successful training.
+# Each entry is (speed, stamina, power, guts, wit, skill points) before support
+# card bonuses, on a successful training.
 _TRAINING_STATS = (
-    ((0, 0, 0, 0, 0),) * 5,
+    ((0, 0, 0, 0, 0, 0),) * 5,
     (
-        (10, 0, 5, 0, 0),
-        (11, 0, 5, 0, 0),
-        (12, 0, 5, 0, 0),
-        (13, 0, 6, 0, 0),
-        (14, 0, 7, 0, 0),
+        (11, 0, 6, 0, 0, 4),
+        (12, 0, 6, 0, 0, 4),
+        (13, 0, 6, 0, 0, 4),
+        (14, 0, 7, 0, 0, 4),
+        (15, 0, 8, 0, 0, 4),
     ),
     (
-        (0, 9, 0, 4, 0),
-        (0, 10, 0, 4, 0),
-        (0, 11, 0, 4, 0),
-        (0, 12, 0, 5, 0),
-        (0, 13, 0, 6, 0),
+        (0, 10, 0, 6, 0, 4),
+        (0, 11, 0, 6, 0, 4),
+        (0, 12, 0, 6, 0, 4),
+        (0, 13, 0, 7, 0, 4),
+        (0, 14, 0, 8, 0, 4),
     ),
     (
-        (0, 5, 8, 0, 0),
-        (0, 5, 9, 0, 0),
-        (0, 5, 10, 0, 0),
-        (0, 6, 11, 0, 0),
-        (0, 7, 12, 0, 0),
+        (0, 6, 9, 0, 0, 4),
+        (0, 6, 10, 0, 0, 4),
+        (0, 6, 11, 0, 0, 4),
+        (0, 7, 12, 0, 0, 4),
+        (0, 8, 13, 0, 0, 4),
     ),
     (
-        (4, 0, 4, 8, 0),
-        (4, 0, 4, 9, 0),
-        (4, 0, 4, 10, 0),
-        (5, 0, 4, 11, 0),
-        (5, 0, 5, 12, 0),
+        (5, 0, 5, 8, 0, 4),
+        (5, 0, 5, 9, 0, 4),
+        (5, 0, 5, 10, 0, 4),
+        (6, 0, 5, 11, 0, 4),
+        (6, 0, 6, 12, 0, 4),
     ),
     (
-        (2, 0, 0, 0, 9),
-        (2, 0, 0, 0, 10),
-        (2, 0, 0, 0, 11),
-        (3, 0, 0, 0, 12),
-        (4, 0, 0, 0, 13),
+        (2, 0, 0, 0, 10, 5),
+        (2, 0, 0, 0, 11, 5),
+        (2, 0, 0, 0, 12, 5),
+        (3, 0, 0, 0, 13, 5),
+        (4, 0, 0, 0, 14, 5),
     ),
 )
 
@@ -119,33 +130,62 @@ _TRAINING_ENERGY = (
     (5, 5, 5, 5, 5),
 )
 
-# (speed, stamina, power, guts, wit) applied when that training fails.
+# Stat change applied when that training fails.
 _FAIL_STATS = (
-    (0, 0, 0, 0, 0),
-    (-10, 0, 0, 0, 0),
-    (0, -10, 0, 0, 0),
-    (0, 0, -10, 0, 0),
-    (0, 0, 0, -10, 0),
-    (0, 0, 0, 0, 0),
+    (0, 0, 0, 0, 0, 0),
+    (-10, 0, 0, 0, 0, 0),
+    (0, -10, 0, 0, 0, 0),
+    (0, 0, -10, 0, 0, 0),
+    (0, 0, 0, -10, 0, 0),
+    (0, 0, 0, 0, 0, 0),
 )
 
+_REST_ACTION = 0
+_WIT_ACTION = 5
 _STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
 _TRAINING_ACTIONS = frozenset({1, 2, 3, 4, 5})
+# Training action that a support card's main stat maps to.
+_TRAINING_FOR_STAT = {stat: index + 1 for index, stat in enumerate(STATS[:5])}
 _MIN_FACILITY_LEVEL = 1
 _MAX_FACILITY_LEVEL = 5
 _USES_PER_FACILITY_LEVEL = 4
+
+# Support card placement weights, before specialty priority.
+_TRAINING_WEIGHT = 100.0
+_AWAY_WEIGHT = 50.0
+
+# Friendship gauges run 0–100; 80 or more "rainbows" the card.
+_MAX_FRIENDSHIP = 100
+_RAINBOW_FRIENDSHIP = 80
+_FRIENDSHIP_PER_TRAINING = 5
+
+# Fixed inputs to the stat gain formula.
+_BASE_MOOD = 0.2
+_UMA_GROWTH = 0.0
+_PER_CARD_BONUS = 0.05
 
 _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
 _MIN_STAT = 0
 _MAX_STAT = 1200
-# Skill points are uncapped; this is only used to scale the observation.
-_SKILL_POINT_OBS_SCALE = max(_ACTION_SKILL_POINTS) * _GAME_INFO.max_game_length
+
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
 
 _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
+
+class _Phase(IntEnum):
+    PLACEMENT = auto()
+    DECISION = auto()
+    RESULT = auto()
+
+
+class CardState(NamedTuple):
+    """Per-career run state for one support card slot."""
+
+    friendship: int
+    placement: int = _PLACEMENT_AWAY
 
 
 def _calendar_parts(turn_1based: int) -> tuple[int, str, str]:
@@ -198,12 +238,89 @@ def _stat_train_failure_chance(energy_after: int) -> float:
     )
 
 
+def _placement_outcomes(card: SupportCard) -> list[tuple[int, float]]:
+    """Where a card shows up this turn: away, or one of the five trainings."""
+    weights = [_AWAY_WEIGHT] + [_TRAINING_WEIGHT] * len(_TRAINING_ACTIONS)
+    weights[_TRAINING_FOR_STAT[card.main_stat]] += card.specialty_priority
+    total = sum(weights)
+    return [(outcome, weight / total) for outcome, weight in enumerate(weights)]
+
+
+def _summed_initial_stats(cards: Sequence[SupportCard]) -> tuple[int, ...]:
+    totals = [0] * _NUM_STATS
+    for card in cards:
+        for stat, amount in card.initial_stats.items():
+            totals[_STAT_INDEX[stat]] += amount
+    return tuple(totals)
+
+
+def _training_multiplier(
+    friendship_multiplier: float,
+    mood_effect: float,
+    training_effectiveness: float,
+    num_characters: int,
+) -> float:
+    return (
+        friendship_multiplier
+        * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
+        * (1.0 + training_effectiveness / 100.0)
+        * (1.0 + _PER_CARD_BONUS * num_characters)
+        * (1.0 + _UMA_GROWTH / 100.0)
+    )
+
+
+def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
+    """Upper bound on skill points from one successful training.
+
+    Assumes every card in the deck attends and every matching card is
+    rainbowed — enough to keep the observation at most 1.
+    """
+    skill = _STAT_INDEX["skill_points"]
+    bonus = sum(card.stat_bonus.get("skill_points", 0) for card in cards)
+    mood_effect = sum(card.mood_effect for card in cards)
+    training_effectiveness = sum(card.training_effectiveness for card in cards)
+    best = 0
+    for action in _TRAINING_ACTIONS:
+        friendship_multiplier = 1.0
+        for card in cards:
+            if _TRAINING_FOR_STAT[card.main_stat] == action:
+                friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
+        # Skill-point columns are constant across facility levels.
+        base = _TRAINING_STATS[action][0][skill]
+        gain = math.floor(
+            (base + bonus)
+            * _training_multiplier(
+                friendship_multiplier,
+                mood_effect,
+                training_effectiveness,
+                len(cards),
+            )
+        )
+        best = max(best, gain)
+    return best
+
+
 class UmaGame(pyspiel.Game):
     def __init__(self, params=None, *, reward_model=None):
+        params = dict(params or {})
+        params.setdefault("cards", deck_param())
         game_type = (
             _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
         )
-        super().__init__(game_type, _GAME_INFO, params or {})
+        super().__init__(game_type, _GAME_INFO, params)
+        self.cards = cards_from_param(str(params["cards"]))
+        if len(self.cards) != _NUM_CARDS:
+            raise ValueError(
+                f"Expected a deck of {_NUM_CARDS} support cards, "
+                f"got {len(self.cards)}"
+            )
+        self.placement_outcomes = tuple(
+            _placement_outcomes(card) for card in self.cards
+        )
+        self.initial_stats = _summed_initial_stats(self.cards)
+        self.skill_point_obs_scale = max(
+            1, _max_skill_points_per_turn(self.cards) * _MAX_TURNS
+        )
 
     def new_initial_state(self, state=None):
         return UmaState(self, state)
@@ -217,32 +334,47 @@ class UmaState(pyspiel.State):
         self, game: UmaGame, state: pyspiel.StateStruct | JsonDict | None = None
     ):
         super().__init__(game)
-        self._is_chance_node = False
         self._turn = 0
 
-        self._speed = 0
-        self._stamina = 0
-        self._power = 0
-        self._guts = 0
-        self._wit = 0
-        self._skill_points = 0
+        (
+            self._speed,
+            self._stamina,
+            self._power,
+            self._guts,
+            self._wit,
+            self._skill_points,
+        ) = game.initial_stats
         self._energy = _STARTING_ENERGY
         # Successful uses of speed, stamina, power, guts, wit facilities.
         self._facility_uses = (0, 0, 0, 0, 0)
+
+        self._card_states = tuple(
+            CardState(card.initial_friendship) for card in game.cards
+        )
+        self._placement_index = 0
+        self._phase = _Phase.PLACEMENT
 
         self._score = 0.0
         self._last_reward = 0.0
         self._pending_action: int | None = None
 
     def current_player(self):
-        if self._is_chance_node:
-            return pyspiel.PlayerId.CHANCE
         if self.is_terminal():
             return pyspiel.PlayerId.TERMINAL
-        return 0
+        if self._phase == _Phase.DECISION:
+            return 0
+        return pyspiel.PlayerId.CHANCE
 
     def action_to_string(self, player, action):
         if player == pyspiel.PlayerId.CHANCE:
+            if self._phase == _Phase.PLACEMENT:
+                card = self.get_game().cards[self._placement_index]
+                where = (
+                    "away"
+                    if action == _PLACEMENT_AWAY
+                    else self.action_to_string(0, action)
+                )
+                return f"{card.name} -> {where}"
             match action:
                 case 0:
                     return "fail"
@@ -267,7 +399,9 @@ class UmaState(pyspiel.State):
                 raise ValueError(f"Invalid action: {action}")
 
     def legal_actions(self, player=None):
-        if self._is_chance_node:
+        if self._phase == _Phase.PLACEMENT:
+            return list(range(_NUM_PLACEMENT_OUTCOMES))
+        if self._phase == _Phase.RESULT:
             return [_CHANCE_FAIL, _CHANCE_SUCCESS]
         return [a for a in range(_GAME_INFO.num_distinct_actions)]
 
@@ -279,12 +413,73 @@ class UmaState(pyspiel.State):
             return _MAX_FACILITY_LEVEL
         return self._permanent_facility_level_for(action)
 
+    def _attending(self, action: int) -> list[int]:
+        """Indices of the support cards on a training facility this turn."""
+        assert action in _TRAINING_ACTIONS
+        return [
+            index
+            for index, card_state in enumerate(self._card_states)
+            if card_state.placement == action
+        ]
+
+    def _is_rainbow(self, index: int) -> bool:
+        return self._card_states[index].friendship >= _RAINBOW_FRIENDSHIP
+
+    def _wit_energy_recovery(self) -> int:
+        # Only rainbowed cards standing on the wit facility recover energy.
+        cards = self.get_game().cards
+        return sum(
+            cards[index].wit_friendship_recovery
+            for index in self._attending(_WIT_ACTION)
+            if self._is_rainbow(index)
+        )
+
     def _energy_delta(self, action: int) -> int:
-        level = 1 if action == 0 else self._facility_level_for(action)
-        return _TRAINING_ENERGY[action][level - 1]
+        level = 1 if action == _REST_ACTION else self._facility_level_for(action)
+        delta = _TRAINING_ENERGY[action][level - 1]
+        if action == _WIT_ACTION:
+            delta += self._wit_energy_recovery()
+        return delta
+
+    def _training_gains(self, action: int) -> tuple[int, ...]:
+        """Stat gains of a successful training, including support card effects."""
+        if action == _REST_ACTION:
+            return (0,) * _NUM_STATS
+        base = _TRAINING_STATS[action][self._facility_level_for(action) - 1]
+        cards = self.get_game().cards
+        attending = self._attending(action)
+
+        friendship_multiplier = 1.0
+        mood_effect = 0.0
+        training_effectiveness = 0.0
+        stat_bonus = [0] * _NUM_STATS
+        for index in attending:
+            card = cards[index]
+            if _TRAINING_FOR_STAT[card.main_stat] == action and self._is_rainbow(
+                index
+            ):
+                friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
+            mood_effect += card.mood_effect
+            training_effectiveness += card.training_effectiveness
+            for stat, amount in card.stat_bonus.items():
+                stat_bonus[_STAT_INDEX[stat]] += amount
+
+        multiplier = _training_multiplier(
+            friendship_multiplier,
+            mood_effect,
+            training_effectiveness,
+            len(attending),
+        )
+        # A stat bonus only applies to stats the training already grants.
+        return tuple(
+            math.floor((amount + stat_bonus[index]) * multiplier) if amount else 0
+            for index, amount in enumerate(base)
+        )
 
     def chance_outcomes(self):
         assert self.is_chance_node()
+        if self._phase == _Phase.PLACEMENT:
+            return self.get_game().placement_outcomes[self._placement_index]
         assert self._pending_action is not None
         energy_after = _clip_energy(
             self._energy + self._energy_delta(self._pending_action)
@@ -292,38 +487,81 @@ class UmaState(pyspiel.State):
         p_fail = _stat_train_failure_chance(energy_after)
         return [(_CHANCE_FAIL, p_fail), (_CHANCE_SUCCESS, 1.0 - p_fail)]
 
+    def _apply_stats(self, gains: Sequence[int]) -> tuple[int, ...]:
+        """Applies stat changes and returns the deltas that actually landed."""
+        before = (
+            self._speed,
+            self._stamina,
+            self._power,
+            self._guts,
+            self._wit,
+        )
+        after = tuple(_clip_stat(old + gain) for old, gain in zip(before, gains))
+        (
+            self._speed,
+            self._stamina,
+            self._power,
+            self._guts,
+            self._wit,
+        ) = after
+        self._skill_points += gains[5]
+        return tuple(new - old for new, old in zip(after, before)) + (gains[5],)
+
     def _apply_training_result(self, action: int, success: bool) -> None:
         if success:
+            gains = self._training_gains(action)
+            # Energy recovery is read before friendships move this turn.
             self._energy = _clip_energy(self._energy + self._energy_delta(action))
             if action in _TRAINING_ACTIONS:
-                speed, stamina, power, guts, wit = _TRAINING_STATS[action][
-                    self._facility_level_for(action) - 1
-                ]
                 uses = list(self._facility_uses)
                 uses[action - 1] += 1
                 self._facility_uses = tuple(uses)
-            else:
-                speed, stamina, power, guts, wit = (0, 0, 0, 0, 0)
-            skill_points = _ACTION_SKILL_POINTS[action]
-            self._skill_points += skill_points
-            self._last_reward = (
-                _ACTION_REWARDS[action] + _SKILL_POINT_WEIGHT * skill_points
-            )
-            self._score += self._last_reward
+                card_states = list(self._card_states)
+                for index in self._attending(action):
+                    card_states[index] = card_states[index]._replace(
+                        friendship=min(
+                            _MAX_FRIENDSHIP,
+                            card_states[index].friendship
+                            + _FRIENDSHIP_PER_TRAINING,
+                        )
+                    )
+                self._card_states = tuple(card_states)
         else:
-            speed, stamina, power, guts, wit = _FAIL_STATS[action]
-            self._last_reward = 0.0
-        self._speed = _clip_stat(self._speed + speed)
-        self._stamina = _clip_stat(self._stamina + stamina)
-        self._power = _clip_stat(self._power + power)
-        self._guts = _clip_stat(self._guts + guts)
-        self._wit = _clip_stat(self._wit + wit)
+            gains = _FAIL_STATS[action]
+
+        applied = self._apply_stats(gains)
+        self._last_reward = sum(
+            weight * delta for weight, delta in zip(_STAT_WEIGHTS, applied)
+        )
+        self._score += self._last_reward
+
         self._turn += 1
         self._pending_action = None
-        self._is_chance_node = False
+        self._begin_turn()
+
+    def _begin_turn(self) -> None:
+        self._card_states = tuple(
+            card_state._replace(placement=_PLACEMENT_AWAY)
+            for card_state in self._card_states
+        )
+        self._placement_index = 0
+        self._phase = _Phase.PLACEMENT
 
     def apply_action(self, action):
-        if self._is_chance_node:
+        if self._phase == _Phase.PLACEMENT:
+            if action not in range(_NUM_PLACEMENT_OUTCOMES):
+                raise ValueError(f"Invalid placement outcome: {action}")
+            card_states = list(self._card_states)
+            card_states[self._placement_index] = card_states[
+                self._placement_index
+            ]._replace(placement=action)
+            self._card_states = tuple(card_states)
+            self._placement_index += 1
+            if self._placement_index == _NUM_CARDS:
+                self._phase = _Phase.DECISION
+            return
+
+        if self._phase == _Phase.RESULT:
             assert self._pending_action is not None
             self._apply_training_result(
                 self._pending_action, success=(action == _CHANCE_SUCCESS)
@@ -341,12 +579,12 @@ class UmaState(pyspiel.State):
         )
         if 0.0 < fail_p < 1.0:
             self._pending_action = action
-            self._is_chance_node = True
+            self._phase = _Phase.RESULT
             return
         self._apply_training_result(action, success=(fail_p == 0.0))
 
     def is_terminal(self):
-        return self._turn >= _GAME_INFO.max_game_length
+        return self._turn >= _MAX_TURNS
 
     def _current_turn_1based(self) -> int:
         if self._turn >= _MAX_TURNS:
@@ -362,8 +600,30 @@ class UmaState(pyspiel.State):
     def returns(self):
         return [self._score]
 
+    def _friendship_string(self) -> str:
+        cards = self.get_game().cards
+        return ", ".join(
+            f"{card.name} {card_state.friendship}"
+            for card, card_state in zip(cards, self._card_states)
+        )
+
+    def _placement_string(self) -> str:
+        cards = self.get_game().cards
+        by_place: dict[int, list[str]] = {}
+        for index in range(self._placement_index):
+            by_place.setdefault(self._card_states[index].placement, []).append(
+                cards[index].name
+            )
+        parts = []
+        for place, names in sorted(by_place.items()):
+            where = (
+                "away" if place == _PLACEMENT_AWAY else self.action_to_string(0, place)
+            )
+            parts.append(f"{where}: {'/'.join(names)}")
+        return ", ".join(parts) if parts else "unrolled"
+
     def __str__(self):
-        return (
+        career = (
             f"{calendar_label(self._current_turn_1based())}, "
             f"Speed: {self._speed}, Stamina: {self._stamina}, "
             f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
@@ -374,26 +634,34 @@ class UmaState(pyspiel.State):
             f"guts {self._facility_level_for(4)}, "
             f"wit {self._facility_level_for(5)}"
         )
+        lines = [career, f"Friendship: {self._friendship_string()}"]
+        if not self.is_terminal():
+            lines.append(f"Supports: {self._placement_string()}")
+        return "\n".join(lines)
 
 
 class UmaObserver:
     def __init__(self, params=None):
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}")
-        self.tensor = np.zeros(13, np.float32)
+        # 13 career features, then a placement one-hot and friendship per card.
+        self.tensor = np.zeros(
+            13 + _NUM_CARDS * (_NUM_PLACEMENT_OUTCOMES + 1), np.float32
+        )
         self.dict = {"observation": self.tensor}
 
     def set_from(self, state: UmaState, player):
         del player
         # Scaled to roughly [0, 1] so the values are usable as network inputs.
-        self.tensor[:] = (
-            state._turn / _GAME_INFO.max_game_length,
+        self.tensor[:] = 0.0
+        self.tensor[:13] = (
+            state._turn / _MAX_TURNS,
             state._speed / _MAX_STAT,
             state._stamina / _MAX_STAT,
             state._power / _MAX_STAT,
             state._guts / _MAX_STAT,
             state._wit / _MAX_STAT,
-            state._skill_points / _SKILL_POINT_OBS_SCALE,
+            state._skill_points / state.get_game().skill_point_obs_scale,
             state._energy / _STARTING_ENERGY,
             state._facility_level_for(1) / _MAX_FACILITY_LEVEL,
             state._facility_level_for(2) / _MAX_FACILITY_LEVEL,
@@ -401,6 +669,14 @@ class UmaObserver:
             state._facility_level_for(4) / _MAX_FACILITY_LEVEL,
             state._facility_level_for(5) / _MAX_FACILITY_LEVEL,
         )
+        offset = 13
+        for index in range(_NUM_CARDS):
+            card_state = state._card_states[index]
+            self.tensor[offset + card_state.placement] = 1.0
+            self.tensor[offset + _NUM_PLACEMENT_OUTCOMES] = (
+                card_state.friendship / _MAX_FRIENDSHIP
+            )
+            offset += _NUM_PLACEMENT_OUTCOMES + 1
 
     def string_from(self, state: UmaState, player):
         del player

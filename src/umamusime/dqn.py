@@ -1,4 +1,5 @@
 import pathlib
+import time
 
 import torch
 from open_spiel.python import rl_environment
@@ -65,20 +66,41 @@ def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> Non
             )
 
 
-def play(
+def train(
     *, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT
+) -> float:
+    """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
+    env, agent = _make_env_and_agent()
+    started = time.perf_counter()
+    _train(env, agent, log=verbose)
+    elapsed = time.perf_counter() - started
+    _save(agent, checkpoint)
+    if verbose:
+        print(f"Trained {checkpoint} in {elapsed:.1f}s")
+    return elapsed
+
+
+def play(
+    *,
+    verbose: bool = True,
+    checkpoint: pathlib.Path = _CHECKPOINT,
+    seed: int | None = None,
+    retrain: bool = False,
 ) -> tuple[UmaState, list[int]]:
     env, agent = _make_env_and_agent()
-    if checkpoint.exists():
-        agent.load(checkpoint)
-        if verbose:
-            print(f"Loaded {checkpoint}, skipping training")
-    else:
+    if retrain or not checkpoint.exists():
         _train(env, agent, log=verbose)
         _save(agent, checkpoint)
         if verbose:
             print(f"Saved {checkpoint}")
+    else:
+        agent.load(checkpoint)
+        if verbose:
+            print(f"Loaded {checkpoint}, skipping training")
 
+    # Seed only the evaluation episode so training stays independent of it.
+    if seed is not None:
+        env.seed(seed)
     time_step = env.reset()
     actions: list[int] = []
     while not time_step.last():
