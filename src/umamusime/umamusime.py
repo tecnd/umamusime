@@ -245,42 +245,50 @@ def _summed_initial_stats(cards: Sequence[SupportCard]) -> tuple[int, ...]:
     return tuple(totals)
 
 
+def _training_multiplier(
+    friendship_multiplier: float,
+    mood_effect: float,
+    training_effectiveness: float,
+    num_characters: int,
+) -> float:
+    return (
+        friendship_multiplier
+        * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
+        * (1.0 + training_effectiveness / 100.0)
+        * (1.0 + _PER_CARD_BONUS * num_characters)
+        * (1.0 + _UMA_GROWTH / 100.0)
+    )
+
+
 def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
     """Upper bound on skill points from one successful training.
 
     Assumes every card in the deck attends and every matching card is
     rainbowed — enough to keep the observation at most 1.
     """
+    skill = _STAT_INDEX["skill_points"]
+    bonus = sum(card.stat_bonus.get("skill_points", 0) for card in cards)
+    mood_effect = sum(card.mood_effect for card in cards)
+    training_effectiveness = sum(card.training_effectiveness for card in cards)
     best = 0
     for action in _TRAINING_ACTIONS:
-        base = max(level[5] for level in _TRAINING_STATS[action])
-        bonus = 0
         friendship_multiplier = 1.0
-        mood_effect = 0.0
-        training_effectiveness = 0.0
         for card in cards:
-            bonus += card.stat_bonus.get("skill_points", 0)
-            mood_effect += card.mood_effect
-            training_effectiveness += card.training_effectiveness
             if _TRAINING_FOR_STAT[card.main_stat] == action:
                 friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
-        multiplier = (
-            friendship_multiplier
-            * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
-            * (1.0 + training_effectiveness / 100.0)
-            * (1.0 + _PER_CARD_BONUS * len(cards))
-            * (1.0 + _UMA_GROWTH / 100.0)
+        # Skill-point columns are constant across facility levels.
+        base = _TRAINING_STATS[action][0][skill]
+        gain = math.floor(
+            (base + bonus)
+            * _training_multiplier(
+                friendship_multiplier,
+                mood_effect,
+                training_effectiveness,
+                len(cards),
+            )
         )
-        best = max(best, math.floor((base + bonus) * multiplier))
+        best = max(best, gain)
     return best
-
-
-def _skill_point_obs_scale(cards: Sequence[SupportCard]) -> int:
-    return max(1, _max_skill_points_per_turn(cards) * _MAX_TURNS)
-
-
-# Skill points are uncapped; this is only used to scale the observation.
-_SKILL_POINT_OBS_SCALE = _skill_point_obs_scale(DEFAULT_DECK)
 
 
 class UmaGame(pyspiel.Game):
@@ -299,7 +307,9 @@ class UmaGame(pyspiel.Game):
             _placement_outcomes(card) for card in self.cards
         )
         self.initial_stats = _summed_initial_stats(self.cards)
-        self.skill_point_obs_scale = _skill_point_obs_scale(self.cards)
+        self.skill_point_obs_scale = max(
+            1, _max_skill_points_per_turn(self.cards) * _MAX_TURNS
+        )
 
     def new_initial_state(self, state=None):
         return UmaState(self, state)
@@ -442,12 +452,11 @@ class UmaState(pyspiel.State):
             for stat, amount in card.stat_bonus.items():
                 stat_bonus[_STAT_INDEX[stat]] += amount
 
-        multiplier = (
-            friendship_multiplier
-            * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
-            * (1.0 + training_effectiveness / 100.0)
-            * (1.0 + _PER_CARD_BONUS * len(attending))
-            * (1.0 + _UMA_GROWTH / 100.0)
+        multiplier = _training_multiplier(
+            friendship_multiplier,
+            mood_effect,
+            training_effectiveness,
+            len(attending),
         )
         # A stat bonus only applies to stats the training already grants.
         return tuple(
