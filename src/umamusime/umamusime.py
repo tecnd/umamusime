@@ -167,8 +167,6 @@ _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
 _MIN_STAT = 0
 _MAX_STAT = 1200
-# Skill points are uncapped; this is only used to scale the observation.
-_SKILL_POINT_OBS_SCALE = 1000
 
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
@@ -247,6 +245,44 @@ def _summed_initial_stats(cards: Sequence[SupportCard]) -> tuple[int, ...]:
     return tuple(totals)
 
 
+def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
+    """Upper bound on skill points from one successful training.
+
+    Assumes every card in the deck attends and every matching card is
+    rainbowed — enough to keep the observation at most 1.
+    """
+    best = 0
+    for action in _TRAINING_ACTIONS:
+        base = max(level[5] for level in _TRAINING_STATS[action])
+        bonus = 0
+        friendship_multiplier = 1.0
+        mood_effect = 0.0
+        training_effectiveness = 0.0
+        for card in cards:
+            bonus += card.stat_bonus.get("skill_points", 0)
+            mood_effect += card.mood_effect
+            training_effectiveness += card.training_effectiveness
+            if _TRAINING_FOR_STAT[card.main_stat] == action:
+                friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
+        multiplier = (
+            friendship_multiplier
+            * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
+            * (1.0 + training_effectiveness / 100.0)
+            * (1.0 + _PER_CARD_BONUS * len(cards))
+            * (1.0 + _UMA_GROWTH / 100.0)
+        )
+        best = max(best, math.floor((base + bonus) * multiplier))
+    return best
+
+
+def _skill_point_obs_scale(cards: Sequence[SupportCard]) -> int:
+    return max(1, _max_skill_points_per_turn(cards) * _MAX_TURNS)
+
+
+# Skill points are uncapped; this is only used to scale the observation.
+_SKILL_POINT_OBS_SCALE = _skill_point_obs_scale(DEFAULT_DECK)
+
+
 class UmaGame(pyspiel.Game):
     def __init__(self, params=None, *, reward_model=None, cards=DEFAULT_DECK):
         game_type = (
@@ -263,6 +299,7 @@ class UmaGame(pyspiel.Game):
             _placement_outcomes(card) for card in self.cards
         )
         self.initial_stats = _summed_initial_stats(self.cards)
+        self.skill_point_obs_scale = _skill_point_obs_scale(self.cards)
 
     def new_initial_state(self, state=None):
         return UmaState(self, state)
@@ -595,7 +632,7 @@ class UmaObserver:
             state._power / _MAX_STAT,
             state._guts / _MAX_STAT,
             state._wit / _MAX_STAT,
-            state._skill_points / _SKILL_POINT_OBS_SCALE,
+            state._skill_points / state.get_game().skill_point_obs_scale,
             state._energy / _STARTING_ENERGY,
             state._facility_level_for(1) / _MAX_FACILITY_LEVEL,
             state._facility_level_for(2) / _MAX_FACILITY_LEVEL,
