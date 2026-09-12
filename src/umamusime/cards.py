@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 # Stat order used by every stat tuple in the game. Skill points are a stat:
@@ -115,3 +115,17 @@ DEFAULT_DECK = (
     SUPER_CREEK,
     AGNES_TACHYON,
 )
+
+CARD_BY_NAME = {card.name: card for card in DEFAULT_DECK}
+
+
+def deck_param(cards: Sequence[SupportCard] = DEFAULT_DECK) -> str:
+    return ",".join(card.name for card in cards)
+
+
+def cards_from_param(value: str) -> tuple[SupportCard, ...]:
+    names = [name.strip() for name in value.split(",") if name.strip()]
+    unknown = [name for name in names if name not in CARD_BY_NAME]
+    if unknown:
+        raise ValueError(f"Unknown support cards: {unknown}")
+    return tuple(CARD_BY_NAME[name] for name in names)

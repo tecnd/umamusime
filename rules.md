@@ -51,7 +51,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as `UmaGame(cards=...)` and defaulting to `cards.DEFAULT_DECK`. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 

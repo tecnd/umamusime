@@ -1,12 +1,12 @@
 import math
 from collections.abc import Sequence
 from enum import IntEnum, auto
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import pyspiel
 
-from .cards import DEFAULT_DECK, STATS, SupportCard
+from .cards import STATS, SupportCard, cards_from_param, deck_param
 
 JsonDict = dict[str, Any]
 
@@ -28,7 +28,7 @@ def _make_game_type(
         provides_information_state_tensor=False,
         provides_observation_string=True,
         provides_observation_tensor=True,
-        parameter_specification={},
+        parameter_specification={"cards": deck_param()},
     )
 
 
@@ -181,6 +181,13 @@ class _Phase(IntEnum):
     RESULT = auto()
 
 
+class CardState(NamedTuple):
+    """Per-career run state for one support card slot."""
+
+    friendship: int
+    placement: int = _PLACEMENT_AWAY
+
+
 def _calendar_parts(turn_1based: int) -> tuple[int, str, str]:
     index = turn_1based - 1
     year = index // _TURNS_PER_YEAR + 1
@@ -294,12 +301,14 @@ def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
 
 
 class UmaGame(pyspiel.Game):
-    def __init__(self, params=None, *, reward_model=None, cards=DEFAULT_DECK):
+    def __init__(self, params=None, *, reward_model=None):
+        params = dict(params or {})
+        params.setdefault("cards", deck_param())
         game_type = (
             _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
         )
-        super().__init__(game_type, _GAME_INFO, params or {})
-        self.cards = tuple(cards)
+        super().__init__(game_type, _GAME_INFO, params)
+        self.cards = cards_from_param(str(params["cards"]))
         if len(self.cards) != _NUM_CARDS:
             raise ValueError(
                 f"Expected a deck of {_NUM_CARDS} support cards, "
@@ -339,8 +348,9 @@ class UmaState(pyspiel.State):
         # Successful uses of speed, stamina, power, guts, wit facilities.
         self._facility_uses = (0, 0, 0, 0, 0)
 
-        self._friendship = tuple(card.initial_friendship for card in game.cards)
-        self._placements = (_PLACEMENT_AWAY,) * _NUM_CARDS
+        self._card_states = tuple(
+            CardState(card.initial_friendship) for card in game.cards
+        )
         self._placement_index = 0
         self._phase = _Phase.PLACEMENT
 
@@ -408,12 +418,12 @@ class UmaState(pyspiel.State):
         assert action in _TRAINING_ACTIONS
         return [
             index
-            for index, placement in enumerate(self._placements)
-            if placement == action
+            for index, card_state in enumerate(self._card_states)
+            if card_state.placement == action
         ]
 
     def _is_rainbow(self, index: int) -> bool:
-        return self._friendship[index] >= _RAINBOW_FRIENDSHIP
+        return self._card_states[index].friendship >= _RAINBOW_FRIENDSHIP
 
     def _wit_energy_recovery(self) -> int:
         # Only rainbowed cards standing on the wit facility recover energy.
@@ -506,13 +516,16 @@ class UmaState(pyspiel.State):
                 uses = list(self._facility_uses)
                 uses[action - 1] += 1
                 self._facility_uses = tuple(uses)
-                friendship = list(self._friendship)
+                card_states = list(self._card_states)
                 for index in self._attending(action):
-                    friendship[index] = min(
-                        _MAX_FRIENDSHIP,
-                        friendship[index] + _FRIENDSHIP_PER_TRAINING,
+                    card_states[index] = card_states[index]._replace(
+                        friendship=min(
+                            _MAX_FRIENDSHIP,
+                            card_states[index].friendship
+                            + _FRIENDSHIP_PER_TRAINING,
+                        )
                     )
-                self._friendship = tuple(friendship)
+                self._card_states = tuple(card_states)
         else:
             gains = _FAIL_STATS[action]
 
@@ -527,7 +540,10 @@ class UmaState(pyspiel.State):
         self._begin_turn()
 
     def _begin_turn(self) -> None:
-        self._placements = (_PLACEMENT_AWAY,) * _NUM_CARDS
+        self._card_states = tuple(
+            card_state._replace(placement=_PLACEMENT_AWAY)
+            for card_state in self._card_states
+        )
         self._placement_index = 0
         self._phase = _Phase.PLACEMENT
 
@@ -535,9 +551,11 @@ class UmaState(pyspiel.State):
         if self._phase == _Phase.PLACEMENT:
             if action not in range(_NUM_PLACEMENT_OUTCOMES):
                 raise ValueError(f"Invalid placement outcome: {action}")
-            placements = list(self._placements)
-            placements[self._placement_index] = action
-            self._placements = tuple(placements)
+            card_states = list(self._card_states)
+            card_states[self._placement_index] = card_states[
+                self._placement_index
+            ]._replace(placement=action)
+            self._card_states = tuple(card_states)
             self._placement_index += 1
             if self._placement_index == _NUM_CARDS:
                 self._phase = _Phase.DECISION
@@ -585,15 +603,15 @@ class UmaState(pyspiel.State):
     def _friendship_string(self) -> str:
         cards = self.get_game().cards
         return ", ".join(
-            f"{card.name} {friendship}"
-            for card, friendship in zip(cards, self._friendship)
+            f"{card.name} {card_state.friendship}"
+            for card, card_state in zip(cards, self._card_states)
         )
 
     def _placement_string(self) -> str:
         cards = self.get_game().cards
         by_place: dict[int, list[str]] = {}
         for index in range(self._placement_index):
-            by_place.setdefault(self._placements[index], []).append(
+            by_place.setdefault(self._card_states[index].placement, []).append(
                 cards[index].name
             )
         parts = []
@@ -653,9 +671,10 @@ class UmaObserver:
         )
         offset = 13
         for index in range(_NUM_CARDS):
-            self.tensor[offset + state._placements[index]] = 1.0
+            card_state = state._card_states[index]
+            self.tensor[offset + card_state.placement] = 1.0
             self.tensor[offset + _NUM_PLACEMENT_OUTCOMES] = (
-                state._friendship[index] / _MAX_FRIENDSHIP
+                card_state.friendship / _MAX_FRIENDSHIP
             )
             offset += _NUM_PLACEMENT_OUTCOMES + 1
 
