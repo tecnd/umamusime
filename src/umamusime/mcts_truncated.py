@@ -2,7 +2,8 @@ import numpy as np
 import pyspiel
 from open_spiel.python.algorithms import mcts
 
-from .umamusime import _NODES_PER_TURN, UmaGame, UmaState
+from .actions import NODES_PER_TURN
+from .umamusime import UmaGame, UmaState
 
 # Rollouts are ~99% of search time, so they are the only thing worth tuning.
 # Truncating them is both faster and stronger: a rollout that plays random
@@ -11,7 +12,7 @@ from .umamusime import _NODES_PER_TURN, UmaGame, UmaState
 # turns the leaf value into the score accumulated over the next few turns,
 # which actually separates the candidate actions.
 ROLLOUT_TURNS = 6
-ROLLOUT_LENGTH = ROLLOUT_TURNS * _NODES_PER_TURN
+ROLLOUT_LENGTH = ROLLOUT_TURNS * NODES_PER_TURN
 
 
 class TruncatedRolloutEvaluator(mcts.RandomRolloutEvaluator):
