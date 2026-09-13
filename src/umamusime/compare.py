@@ -2,7 +2,8 @@ import time
 from collections.abc import Callable
 
 from . import dqn, mcts_truncated, random_bot
-from .umamusime import UmaGame, UmaState
+from .game import UmaGame
+from .state import UmaState
 
 _RUNS = 3
 _SEED = 42

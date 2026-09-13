@@ -6,7 +6,8 @@ from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import dqn
 
 from .calendar import MAX_TURNS
-from .umamusime import UmaGame, UmaState
+from .game import UmaGame
+from .state import UmaState
 
 # 600 episodes leaves the greedy policy short of the speed/wit line the
 # network is clearly able to learn; 1500 is where a sweep of 600–10000

@@ -3,7 +3,8 @@ import pyspiel
 from open_spiel.python.algorithms import mcts
 
 from .actions import NODES_PER_TURN
-from .umamusime import UmaGame, UmaState
+from .game import UmaGame
+from .state import UmaState
 
 # Rollouts are ~99% of search time, so they are the only thing worth tuning.
 # Truncating them is both faster and stronger: a rollout that plays random
