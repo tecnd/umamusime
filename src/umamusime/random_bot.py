@@ -1,7 +1,8 @@
 import numpy as np
 from open_spiel.python.bots.uniform_random import UniformRandomBot
 
-from .umamusime import UmaGame, UmaState
+from .game import UmaGame
+from .state import UmaState
 
 
 def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:

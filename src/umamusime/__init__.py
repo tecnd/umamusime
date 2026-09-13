@@ -1,7 +1,18 @@
 import numpy as np
 from open_spiel.python.bots.human import HumanBot
 
-from .umamusime import UmaGame, UmaState
+from .calendar import calendar_label
+from .game import UmaGame
+from .observer import UmaObserver
+from .state import UmaState
+
+__all__ = [
+    "UmaGame",
+    "UmaObserver",
+    "UmaState",
+    "calendar_label",
+    "main",
+]
 
 
 def main() -> None:
