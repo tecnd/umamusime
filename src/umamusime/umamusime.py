@@ -1,11 +1,30 @@
 import math
 from collections.abc import Sequence
-from enum import IntEnum, auto
 from typing import Any, NamedTuple
 
 import numpy as np
 import pyspiel
 
+from .actions import (
+    CHANCE_FAIL as _CHANCE_FAIL,
+    CHANCE_SUCCESS as _CHANCE_SUCCESS,
+    DECISION_ACTIONS as _DECISION_ACTIONS,
+    NODES_PER_TURN as _NODES_PER_TURN,
+    NUM_ACTIONS as _NUM_ACTIONS,
+    NUM_CARDS as _NUM_CARDS,
+    NUM_PLACEMENT_OUTCOMES as _NUM_PLACEMENT_OUTCOMES,
+    NUM_STATS as _NUM_STATS,
+    PLACEMENT_ACTIONS as _PLACEMENT_ACTIONS,
+    PLACEMENT_AWAY as _PLACEMENT_AWAY,
+    REST_ACTION as _REST_ACTION,
+    RESULT_ACTIONS as _RESULT_ACTIONS,
+    STAT_INDEX as _STAT_INDEX,
+    STAT_TRAIN_ACTIONS as _STAT_TRAIN_ACTIONS,
+    TRAINING_ACTIONS as _TRAINING_ACTIONS,
+    TRAINING_FOR_STAT as _TRAINING_FOR_STAT,
+    WIT_ACTION as _WIT_ACTION,
+    Phase as _Phase,
+)
 from .calendar import (
     MAX_TURNS as _MAX_TURNS,
     SUMMER_CAMP_TURNS as _SUMMER_CAMP_TURNS,
@@ -14,12 +33,30 @@ from .calendar import (
     TENNO_SHO_SPRING_TURN as _TENNO_SHO_SPRING_TURN,
     calendar_label,
 )
-from .cards import STATS, SupportCard, cards_from_param, deck_param
+from .cards import SupportCard, cards_from_param, deck_param
 from .scoring import (
     MAX_STAT as _MAX_STAT,
     MIN_STAT as _MIN_STAT,
     SKILL_POINT_WEIGHT as _SKILL_POINT_WEIGHT,
     stat_score as _stat_score,
+)
+from .training import (
+    FAIL_STATS as _FAIL_STATS,
+    FRIENDSHIP_PER_TRAINING as _FRIENDSHIP_PER_TRAINING,
+    MAX_FACILITY_LEVEL as _MAX_FACILITY_LEVEL,
+    MAX_FRIENDSHIP as _MAX_FRIENDSHIP,
+    RAINBOW_FRIENDSHIP as _RAINBOW_FRIENDSHIP,
+    STARTING_ENERGY as _STARTING_ENERGY,
+    TRAINING_ENERGY as _TRAINING_ENERGY,
+    TRAINING_STATS as _TRAINING_STATS,
+    UMA_GROWTH as _UMA_GROWTH,
+    clip_energy as _clip_energy,
+    facility_level as _facility_level,
+    max_skill_points_per_turn as _max_skill_points_per_turn,
+    placement_outcomes as _placement_outcomes,
+    stat_train_failure_chance as _stat_train_failure_chance,
+    summed_initial_stats as _summed_initial_stats,
+    training_multiplier as _training_multiplier,
 )
 
 JsonDict = dict[str, Any]
@@ -50,213 +87,12 @@ def _make_game_type(
 # and can be given TERMINAL via UmaGame(reward_model=...).
 _GAME_TYPE = _make_game_type()
 
-_NUM_STATS = len(STATS)
-_STAT_INDEX = {stat: index for index, stat in enumerate(STATS)}
-_NUM_CARDS = 6
-# Support cards attend one of the five training facilities, or nobody's.
-_PLACEMENT_AWAY = 0
-_NUM_PLACEMENT_OUTCOMES = 6
-
-# A turn is six placement rolls, the player's action, then a fail/success roll.
-_NODES_PER_TURN = _NUM_CARDS + 2
-_NUM_ACTIONS = 6
-
-# Facility levels 1–5. Rest is not a facility; its row is unused.
-# Each entry is (speed, stamina, power, guts, wit, skill points) before support
-# card bonuses, on a successful training.
-_TRAINING_STATS = (
-    ((0, 0, 0, 0, 0, 0),) * 5,
-    (
-        (11, 0, 6, 0, 0, 4),
-        (12, 0, 6, 0, 0, 4),
-        (13, 0, 6, 0, 0, 4),
-        (14, 0, 7, 0, 0, 4),
-        (15, 0, 8, 0, 0, 4),
-    ),
-    (
-        (0, 10, 0, 6, 0, 4),
-        (0, 11, 0, 6, 0, 4),
-        (0, 12, 0, 6, 0, 4),
-        (0, 13, 0, 7, 0, 4),
-        (0, 14, 0, 8, 0, 4),
-    ),
-    (
-        (0, 6, 9, 0, 0, 4),
-        (0, 6, 10, 0, 0, 4),
-        (0, 6, 11, 0, 0, 4),
-        (0, 7, 12, 0, 0, 4),
-        (0, 8, 13, 0, 0, 4),
-    ),
-    (
-        (5, 0, 5, 8, 0, 4),
-        (5, 0, 5, 9, 0, 4),
-        (5, 0, 5, 10, 0, 4),
-        (6, 0, 5, 11, 0, 4),
-        (6, 0, 6, 12, 0, 4),
-    ),
-    (
-        (2, 0, 0, 0, 10, 5),
-        (2, 0, 0, 0, 11, 5),
-        (2, 0, 0, 0, 12, 5),
-        (3, 0, 0, 0, 13, 5),
-        (4, 0, 0, 0, 14, 5),
-    ),
-)
-
-# Energy change at facility levels 1–5. Rest is always +50.
-_TRAINING_ENERGY = (
-    (50, 50, 50, 50, 50),
-    (-21, -22, -23, -25, -27),
-    (-19, -20, -21, -23, -25),
-    (-20, -21, -22, -24, -26),
-    (-22, -23, -24, -26, -28),
-    (5, 5, 5, 5, 5),
-)
-
-# Stat change applied when that training fails.
-_FAIL_STATS = (
-    (0, 0, 0, 0, 0, 0),
-    (-10, 0, 0, 0, 0, 0),
-    (0, -10, 0, 0, 0, 0),
-    (0, 0, -10, 0, 0, 0),
-    (0, 0, 0, -10, 0, 0),
-    (0, 0, 0, 0, 0, 0),
-)
-
-_REST_ACTION = 0
-_WIT_ACTION = 5
-_STAT_TRAIN_ACTIONS = frozenset({1, 2, 3, 4})
-_TRAINING_ACTIONS = frozenset({1, 2, 3, 4, 5})
-# Training action that a support card's main stat maps to.
-_TRAINING_FOR_STAT = {stat: index + 1 for index, stat in enumerate(STATS[:5])}
-_MIN_FACILITY_LEVEL = 1
-_MAX_FACILITY_LEVEL = 5
-_USES_PER_FACILITY_LEVEL = 4
-
-# Support card placement weights, before specialty priority.
-_TRAINING_WEIGHT = 100.0
-_AWAY_WEIGHT = 50.0
-
-# Friendship gauges run 0–100; 80 or more "rainbows" the card.
-_MAX_FRIENDSHIP = 100
-_RAINBOW_FRIENDSHIP = 80
-_FRIENDSHIP_PER_TRAINING = 5
-
-# Fixed inputs to the stat gain formula. UmaGrowth is Mihono Bourbon's
-# in-game rate: +20% stamina, +10% power, nothing else.
-_BASE_MOOD = 0.2
-_UMA_GROWTH = (0.0, 0.2, 0.1, 0.0, 0.0, 0.0)
-_PER_CARD_BONUS = 0.05
-
-_MAX_ENERGY = 100
-_STARTING_ENERGY = _MAX_ENERGY
-
-_FAIL_FREE_ENERGY = 50
-_FAIL_CHANCE_AT_ZERO = 0.99
-
-_CHANCE_FAIL = 0
-_CHANCE_SUCCESS = 1
-
-_PLACEMENT_ACTIONS = tuple(range(_NUM_PLACEMENT_OUTCOMES))
-_RESULT_ACTIONS = (_CHANCE_FAIL, _CHANCE_SUCCESS)
-_DECISION_ACTIONS = tuple(range(_NUM_ACTIONS))
-
-
-class _Phase(IntEnum):
-    PLACEMENT = auto()
-    DECISION = auto()
-    RESULT = auto()
-
 
 class CardState(NamedTuple):
     """Per-career run state for one support card slot."""
 
     friendship: int
     placement: int = _PLACEMENT_AWAY
-
-
-def _clip_energy(energy: int) -> int:
-    return max(0, min(_MAX_ENERGY, energy))
-
-
-def _facility_level(uses: int) -> int:
-    return min(
-        _MAX_FACILITY_LEVEL,
-        _MIN_FACILITY_LEVEL + uses // _USES_PER_FACILITY_LEVEL,
-    )
-
-
-def _stat_train_failure_chance(energy_after: int) -> float:
-    # Remaining energy >= 50 never fails; 0 is 99% fail; linear in between.
-    if energy_after >= _FAIL_FREE_ENERGY:
-        return 0.0
-    remaining = max(energy_after, 0)
-    return (
-        _FAIL_CHANCE_AT_ZERO
-        * (_FAIL_FREE_ENERGY - remaining)
-        / _FAIL_FREE_ENERGY
-    )
-
-
-def _placement_outcomes(card: SupportCard) -> list[tuple[int, float]]:
-    """Where a card shows up this turn: away, or one of the five trainings."""
-    weights = [_AWAY_WEIGHT] + [_TRAINING_WEIGHT] * len(_TRAINING_ACTIONS)
-    weights[_TRAINING_FOR_STAT[card.main_stat]] += card.specialty_priority
-    total = sum(weights)
-    return [(outcome, weight / total) for outcome, weight in enumerate(weights)]
-
-
-def _summed_initial_stats(cards: Sequence[SupportCard]) -> tuple[int, ...]:
-    totals = [0] * _NUM_STATS
-    for card in cards:
-        for stat, amount in card.initial_stats.items():
-            totals[_STAT_INDEX[stat]] += amount
-    return tuple(totals)
-
-
-def _training_multiplier(
-    friendship_multiplier: float,
-    mood_effect: float,
-    training_effectiveness: float,
-    num_characters: int,
-) -> float:
-    return (
-        friendship_multiplier
-        * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
-        * (1.0 + training_effectiveness / 100.0)
-        * (1.0 + _PER_CARD_BONUS * num_characters)
-    )
-
-
-def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
-    """Upper bound on skill points from one successful training.
-
-    Assumes every card in the deck attends and every matching card is
-    rainbowed — enough to keep the observation at most 1.
-    """
-    skill = _STAT_INDEX["skill_points"]
-    bonus = sum(card.stat_bonus.get("skill_points", 0) for card in cards)
-    mood_effect = sum(card.mood_effect for card in cards)
-    training_effectiveness = sum(card.training_effectiveness for card in cards)
-    best = 0
-    for action in _TRAINING_ACTIONS:
-        friendship_multiplier = 1.0
-        for card in cards:
-            if _TRAINING_FOR_STAT[card.main_stat] == action:
-                friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
-        # Skill-point columns are constant across facility levels.
-        base = _TRAINING_STATS[action][0][skill]
-        gain = math.floor(
-            (base + bonus)
-            * _training_multiplier(
-                friendship_multiplier,
-                mood_effect,
-                training_effectiveness,
-                len(cards),
-            )
-        )
-        best = max(best, gain)
-    return best
 
 
 def _max_utility(cards: Sequence[SupportCard]) -> float:
