@@ -55,6 +55,10 @@ _MONTHS = (
 )
 _SUMMER_CAMP_YEARS = frozenset({2, 3})
 _SUMMER_CAMP_MONTHS = frozenset({"July", "August"})
+# Year 3 Late April: Tenno Sho (Spring). Not a training turn.
+_TENNO_SHO_SPRING_TURN = 56
+_TENNO_SHO_MIN_SPEED = 400
+_TENNO_SHO_MIN_STAMINA = 400
 
 _NUM_STATS = len(STATS)
 _STAT_INDEX = {stat: index for index, stat in enumerate(STATS)}
@@ -148,9 +152,10 @@ _MAX_FRIENDSHIP = 100
 _RAINBOW_FRIENDSHIP = 80
 _FRIENDSHIP_PER_TRAINING = 5
 
-# Fixed inputs to the stat gain formula.
+# Fixed inputs to the stat gain formula. UmaGrowth is Mihono Bourbon's
+# in-game rate: +20% stamina, +10% power, nothing else.
 _BASE_MOOD = 0.2
-_UMA_GROWTH = 0.0
+_UMA_GROWTH = (0.0, 0.2, 0.1, 0.0, 0.0, 0.0)
 _PER_CARD_BONUS = 0.05
 
 _MAX_ENERGY = 100
@@ -265,6 +270,9 @@ def calendar_label(turn_1based: int) -> str:
     return f"Year {year}, {half} {month}"
 
 
+assert calendar_label(_TENNO_SHO_SPRING_TURN) == "Year 3, Late April"
+
+
 def _is_summer_camp_turn(turn_1based: int) -> bool:
     # Years 2–3, Early July through Late August inclusive.
     year, month, _half = _calendar_parts(turn_1based)
@@ -328,7 +336,6 @@ def _training_multiplier(
         * (1.0 + _BASE_MOOD * (1.0 + mood_effect / 100.0))
         * (1.0 + training_effectiveness / 100.0)
         * (1.0 + _PER_CARD_BONUS * num_characters)
-        * (1.0 + _UMA_GROWTH / 100.0)
     )
 
 
@@ -457,6 +464,7 @@ class UmaState(pyspiel.State):
         self._score = 0.0
         self._last_reward = 0.0
         self._pending_action: int | None = None
+        self._soft_failed = False
 
     def current_player(self):
         if self.is_terminal():
@@ -571,8 +579,15 @@ class UmaState(pyspiel.State):
             len(attending),
         )
         # A stat bonus only applies to stats the training already grants.
+        # UmaGrowth is per-stat (Bourbon: 0.2 stamina, 0.1 power).
         return tuple(
-            math.floor((amount + stat_bonus[index]) * multiplier) if amount else 0
+            math.floor(
+                (amount + stat_bonus[index])
+                * multiplier
+                * (1.0 + _UMA_GROWTH[index])
+            )
+            if amount
+            else 0
             for index, amount in enumerate(base)
         )
 
@@ -665,12 +680,28 @@ class UmaState(pyspiel.State):
         self._begin_turn()
 
     def _begin_turn(self) -> None:
+        if self._turn >= _MAX_TURNS or self._soft_failed:
+            return
+        if self._turn + 1 == _TENNO_SHO_SPRING_TURN:
+            self._resolve_tenno_sho_spring()
+            return
         self._card_states = tuple(
             CardState(card_state.friendship, _PLACEMENT_AWAY)
             for card_state in self._card_states
         )
         self._placement_index = 0
         self._phase = _Phase.PLACEMENT
+
+    def _resolve_tenno_sho_spring(self) -> None:
+        # Year 3 Late April is the race, not a training turn.
+        self._turn += 1
+        if (
+            self._speed < _TENNO_SHO_MIN_SPEED
+            or self._stamina < _TENNO_SHO_MIN_STAMINA
+        ):
+            self._soft_failed = True
+            return
+        self._begin_turn()
 
     def apply_action(self, action):
         if self._phase == _Phase.PLACEMENT:
@@ -708,11 +739,14 @@ class UmaState(pyspiel.State):
         self._apply_training_result(action, success=(fail_p == 0.0))
 
     def is_terminal(self):
-        return self._turn >= _MAX_TURNS
+        return self._turn >= _MAX_TURNS or self._soft_failed
+
+    def ended_by_tenno_sho_fail(self) -> bool:
+        return self._soft_failed
 
     def _current_turn_1based(self) -> int:
-        if self._turn >= _MAX_TURNS:
-            return _MAX_TURNS
+        if self.is_terminal():
+            return self._turn if self._turn > 0 else 1
         return self._turn + 1
 
     def is_summer_camp(self) -> bool:
@@ -759,6 +793,12 @@ class UmaState(pyspiel.State):
             f"wit {self._facility_level_for(5)}"
         )
         lines = [career, f"Friendship: {self._friendship_string()}"]
+        if self._soft_failed:
+            lines.append(
+                "Ended: Tenno Sho (Spring) soft fail "
+                f"(need {_TENNO_SHO_MIN_SPEED} speed and "
+                f"{_TENNO_SHO_MIN_STAMINA} stamina)"
+            )
         if not self.is_terminal():
             lines.append(f"Supports: {self._placement_string()}")
         return "\n".join(lines)

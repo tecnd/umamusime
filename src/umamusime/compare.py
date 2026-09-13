@@ -36,6 +36,10 @@ def _report(
     )
     print(f"Final state:\n{state}")
     print(f"Reward: {state.returns()[0]:.1f}")
+    if state.ended_by_tenno_sho_fail():
+        print("Ended: Tenno Sho (Spring) soft fail")
+    else:
+        print("Ended: finished normally")
     print(
         "Actions: "
         + ", ".join(state.action_to_string(0, action) for action in actions)

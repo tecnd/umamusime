@@ -6,6 +6,8 @@ You start at 100 energy. Speed, stamina, power, guts, wit, and skill points star
 
 In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
 
+Year 3 Late April (turn 56) is the **Tenno Sho (Spring)**, not a training turn. If speed or stamina is below 400 when that turn arrives, the run is a **soft fail** and ends immediately. Passing the check skips training for that half-month and the career continues at Year 3 Early May.
+
 Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy is clipped to `[0, 100]`. Skill points are not capped. There is no dedicated skill-point training.
 
 ## Score
@@ -90,10 +92,10 @@ floor((BaseTraining + StatBonus)
       × (1 + BaseMood × (1 + ΣMoodEffect/100))
       × (1 + ΣTrainingEffectiveness/100)
       × (1 + 0.05 × NumCharacters)
-      × (1 + UmaGrowth/100))
+      × (1 + UmaGrowth))
 ```
 
-- `BaseMood` is always 0.2 and `UmaGrowth` is always 0.
+- `BaseMood` is always 0.2. `UmaGrowth` is Mihono Bourbon's in-game rate: **0.2** on stamina, **0.1** on power, and **0** on every other stat (including skill points).
 - Sums and products run over the cards attending the chosen facility only.
 - `NumCharacters` is the number of cards on the chosen facility.
 - `FriendshipBonus` only counts for a card that is rainbowed **and** whose main stat matches the training; these multiply together.
@@ -107,7 +109,7 @@ Worked example: level 5 speed with rainbow Kitasan Black, non-rainbow Tokai Teio
 
 `1.25 × (1 + 0.2 × (1 + 120/100)) × 1.30 × 1.15 = 2.691`
 
-→ 40 speed, 26 power, 10 skill points, −27 energy. Fine Motion's rainbow status does not matter here: her friendship bonus only applies on wit.
+→ 40 speed, 29 power (`floor(10 × 2.691 × 1.1)`), 10 skill points, −27 energy. Fine Motion's rainbow status does not matter here: her friendship bonus only applies on wit. Power is higher than the shared multiplier alone because of Bourbon's 0.1 UmaGrowth.
 
 ### Wit friendship recovery
 
