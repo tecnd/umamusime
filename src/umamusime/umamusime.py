@@ -229,6 +229,11 @@ def _stat_score(value: int) -> int:
     return _STAT_SCORES[value]
 
 
+def _five_stat_score(stats: Sequence[int]) -> int:
+    """UmaTools lookup sum for speed, stamina, power, guts, and wit."""
+    return sum(_stat_score(stats[index]) for index in range(5))
+
+
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
 
@@ -370,27 +375,25 @@ def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
     return best
 
 
-def _min_utility(cards: Sequence[SupportCard]) -> float:
-    """Lowest possible return: fail every initial stat down to 0.
+def _min_utility() -> float:
+    """Lowest possible return: fail every training stat down to 0.
 
-    Five-stat score is a function of the current value, so a career cannot
-    go below −sum(stat_score(initial)). Skill points never decrease.
+    Five-stat score is the lookup of the current value, including the
+    deck's initial grants, so a career cannot go below 0. Skill points
+    never decrease.
     """
-    initials = _summed_initial_stats(cards)
-    return -sum(_stat_score(initials[index]) for index in range(5))
+    return 0.0
 
 
 def _max_utility(cards: Sequence[SupportCard]) -> float:
     """Highest possible return for this deck.
 
-    Each of the five capped stats scores at most stat_score(1200) minus its
-    initial lookup value. Skill points keep the flat 1.3 weight times the
-    all-cards-attend rainbow ceiling already used for the observation scale.
+    Each of the five capped stats scores at most stat_score(1200),
+    including the deck's initial grants. Skill points keep the flat 1.3
+    weight times the all-cards-attend rainbow ceiling already used for
+    the observation scale.
     """
-    initials = _summed_initial_stats(cards)
-    five = sum(
-        _stat_score(_MAX_STAT) - _stat_score(initials[index]) for index in range(5)
-    )
+    five = 5 * _stat_score(_MAX_STAT)
     skill = _SKILL_POINT_WEIGHT * _max_skill_points_per_turn(cards) * _MAX_TURNS
     return five + skill
 
@@ -400,7 +403,7 @@ def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
         num_distinct_actions=_NUM_ACTIONS,
         max_chance_outcomes=_NUM_PLACEMENT_OUTCOMES,
         num_players=1,
-        min_utility=_min_utility(cards),
+        min_utility=_min_utility(),
         max_utility=_max_utility(cards),
         max_game_length=_MAX_TURNS * _NODES_PER_TURN,
     )
@@ -461,7 +464,17 @@ class UmaState(pyspiel.State):
         self._placement_index = 0
         self._phase = _Phase.PLACEMENT
 
-        self._score = 0.0
+        self._score = float(
+            _five_stat_score(
+                (
+                    self._speed,
+                    self._stamina,
+                    self._power,
+                    self._guts,
+                    self._wit,
+                )
+            )
+        )
         self._last_reward = 0.0
         self._pending_action: int | None = None
         self._soft_failed = False
