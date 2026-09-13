@@ -53,7 +53,7 @@ from .training import (
 )
 
 if TYPE_CHECKING:
-    from .umamusime import UmaGame
+    from .game import UmaGame
 
 JsonDict = dict[str, Any]
 
