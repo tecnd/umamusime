@@ -6,7 +6,21 @@ from typing import Any, NamedTuple
 import numpy as np
 import pyspiel
 
+from .calendar import (
+    MAX_TURNS as _MAX_TURNS,
+    SUMMER_CAMP_TURNS as _SUMMER_CAMP_TURNS,
+    TENNO_SHO_MIN_SPEED as _TENNO_SHO_MIN_SPEED,
+    TENNO_SHO_MIN_STAMINA as _TENNO_SHO_MIN_STAMINA,
+    TENNO_SHO_SPRING_TURN as _TENNO_SHO_SPRING_TURN,
+    calendar_label,
+)
 from .cards import STATS, SupportCard, cards_from_param, deck_param
+from .scoring import (
+    MAX_STAT as _MAX_STAT,
+    MIN_STAT as _MIN_STAT,
+    SKILL_POINT_WEIGHT as _SKILL_POINT_WEIGHT,
+    stat_score as _stat_score,
+)
 
 JsonDict = dict[str, Any]
 
@@ -35,30 +49,6 @@ def _make_game_type(
 # Per-turn rewards are real (used by DQN). MCTSBot only checks this metadata
 # and can be given TERMINAL via UmaGame(reward_model=...).
 _GAME_TYPE = _make_game_type()
-
-# 3 years × 12 months × 2 half-months.
-_MAX_TURNS = 72
-_TURNS_PER_YEAR = 24
-_MONTHS = (
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-)
-_SUMMER_CAMP_YEARS = frozenset({2, 3})
-_SUMMER_CAMP_MONTHS = frozenset({"July", "August"})
-# Year 3 Late April: Tenno Sho (Spring). Not a training turn.
-_TENNO_SHO_SPRING_TURN = 56
-_TENNO_SHO_MIN_SPEED = 400
-_TENNO_SHO_MIN_STAMINA = 400
 
 _NUM_STATS = len(STATS)
 _STAT_INDEX = {stat: index for index, stat in enumerate(STATS)}
@@ -160,74 +150,6 @@ _PER_CARD_BONUS = 0.05
 
 _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
-_MIN_STAT = 0
-_MAX_STAT = 1200
-
-# Skill points still score a flat 1.3 per landed point. The five training
-# stats use the UmaTools / umakonga lookup: raw per-point rates in 50-point
-# blocks, accumulated, then round(raw / 10). We only need 0-1200 while the
-# game cap stays there. https://daftuyda.moe/guides/rating-system#2-stat-scoring
-_SKILL_POINT_WEIGHT = 1.3
-_STAT_RAW_RATES = (
-    5,
-    8,
-    10,
-    13,
-    16,
-    18,
-    21,
-    24,
-    26,
-    28,
-    29,
-    30,
-    31,
-    33,
-    34,
-    35,
-    39,
-    41,
-    42,
-    43,
-    52,
-    55,
-    66,
-    68,
-    68,
-)
-
-
-def _js_round(value: float) -> int:
-    """JavaScript Math.round: halves away from zero, not banker's rounding."""
-    return int(value + 0.5) if value >= 0 else int(value - 0.5)
-
-
-def _build_stat_scores() -> tuple[int, ...]:
-    scores = [0]
-    raw = 0
-    index = 0
-    for stat in range(1, _MAX_STAT + 1):
-        if stat <= 49:
-            index = 0
-        elif stat <= 99:
-            index = 1
-        elif stat % 50 == 0:
-            index += 1
-        raw += _STAT_RAW_RATES[index]
-        scores.append(_js_round(raw / 10.0))
-    return tuple(scores)
-
-
-_STAT_SCORES = _build_stat_scores()
-
-
-def _stat_score(value: int) -> int:
-    if value <= _MIN_STAT:
-        return _STAT_SCORES[0]
-    if value >= _MAX_STAT:
-        return _STAT_SCORES[_MAX_STAT]
-    return _STAT_SCORES[value]
-
 
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
@@ -251,39 +173,6 @@ class CardState(NamedTuple):
 
     friendship: int
     placement: int = _PLACEMENT_AWAY
-
-
-def _calendar_parts(turn_1based: int) -> tuple[int, str, str]:
-    index = turn_1based - 1
-    year = index // _TURNS_PER_YEAR + 1
-    month = _MONTHS[(index % _TURNS_PER_YEAR) // 2]
-    half = "Early" if index % 2 == 0 else "Late"
-    return year, month, half
-
-
-def calendar_label(turn_1based: int) -> str:
-    """Calendar date for a 1-based turn in 1..72.
-
-    Turn 1 is Year 1, Early January; turn 72 is Year 3, Late December.
-    """
-    year, month, half = _calendar_parts(turn_1based)
-    return f"Year {year}, {half} {month}"
-
-
-assert calendar_label(_TENNO_SHO_SPRING_TURN) == "Year 3, Late April"
-
-
-def _is_summer_camp_turn(turn_1based: int) -> bool:
-    # Years 2–3, Early July through Late August inclusive.
-    year, month, _half = _calendar_parts(turn_1based)
-    return year in _SUMMER_CAMP_YEARS and month in _SUMMER_CAMP_MONTHS
-
-
-# Indexed by 1-based turn; index 0 is unused. Read on every training, so it is
-# worth keeping out of the calendar arithmetic above.
-_SUMMER_CAMP_TURNS = (False,) + tuple(
-    _is_summer_camp_turn(turn) for turn in range(1, _MAX_TURNS + 1)
-)
 
 
 def _clip_energy(energy: int) -> int:
