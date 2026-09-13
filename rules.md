@@ -2,7 +2,7 @@
 
 Single-player career, 72 turns over 3 years. Each turn is half a month: turn 1 is Year 1, Early January and turn 72 is Year 3, Late December.
 
-You start at 100 energy. Speed, stamina, power, guts, wit, and skill points start at 0, plus whatever the support deck grants as **initial {stat}**. The default deck therefore begins at 20 speed, 35 stamina, 55 wit. Those starting stats do not count toward score.
+You start at 100 energy. Speed, stamina, power, guts, wit, and skill points start at 0, plus whatever the support deck grants as **initial {stat}**. The default deck therefore begins at 20 speed, 35 stamina, 55 wit. Those starting stats count toward score.
 
 In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
 
@@ -12,7 +12,7 @@ Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy i
 
 ## Score
 
-Score is the sum of per-turn rewards. Energy is not scored. Initial card stats do not count: each of the five training stats contributes `stat_score(after) − stat_score(before)` on the turn it changes, so a career totals `stat_score(final) − stat_score(initial)` per stat. Skill points still score a flat **1.3** per landed point.
+Score is the sum of per-turn rewards plus the lookup of the deck's initial stats. Energy is not scored. Each of the five training stats contributes `stat_score(after) − stat_score(before)` on the turn it changes, so a career totals `stat_score(final)` per stat. Skill points still score a flat **1.3** per landed point.
 
 `stat_score` is the UmaTools / umakonga lookup ([rating system](https://daftuyda.moe/guides/rating-system#2-stat-scoring)): raw per-point rates in 50-point blocks from 0 to 1200, accumulated, then `round(raw / 10)` the same way JavaScript `Math.round` does (halves away from zero). The displayed score at 1200 is 3,841. Stats stay clipped to `[0, 1200]`; the 1201–2500 bands are unused.
 
@@ -22,7 +22,7 @@ Score is the sum of per-turn rewards. Energy is not scored. Initial card stats d
 
 A failed training scores the lookup drop on the clipped −10 (failed speed at 0 speed scores 0).
 
-`min_utility` is −sum of `stat_score(initial)` on the five stats (default deck −57). `max_utility` is filling every capped stat from its initial lookup value, plus the 1.3 × rainbow skill-point ceiling (`5 × 3841 − 57 + 1.3 × 42 × 72 = 23079.2` on the default deck).
+`min_utility` is 0 (every training stat failed down to 0). `max_utility` is filling every capped stat, plus the 1.3 × rainbow skill-point ceiling (`5 × 3841 + 1.3 × 42 × 72 = 23136.2` on the default deck).
 
 ## Turn structure
 
