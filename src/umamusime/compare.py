@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 
-from . import dqn, mcts, random_bot
+from . import dqn, mcts_truncated, random_bot
 from .umamusime import UmaGame, UmaState
 
 _RUNS = 3
@@ -55,7 +55,7 @@ def main() -> None:
 
     def play_mcts(index: int) -> tuple[UmaState, list[int]]:
         started = time.perf_counter()
-        result = mcts.play(verbose=False, seed=_SEED + index)
+        result = mcts_truncated.play(verbose=False, seed=_SEED + index)
         if index == 0:
             mcts_run_s.append(time.perf_counter() - started)
         return result
