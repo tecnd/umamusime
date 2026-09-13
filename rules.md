@@ -10,13 +10,17 @@ Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy i
 
 ## Score
 
-Score is the sum of per-turn rewards. Each turn's reward is the weighted sum of the stat **deltas that actually landed** after clipping:
+Score is the sum of per-turn rewards. Energy is not scored. Initial card stats do not count: each of the five training stats contributes `stat_score(after) − stat_score(before)` on the turn it changes, so a career totals `stat_score(final) − stat_score(initial)` per stat. Skill points still score a flat **1.3** per landed point.
 
-| Stat | Speed | Stamina | Power | Guts | Wit | Skill points |
-| --- | --- | --- | --- | --- | --- | --- |
-| Weight | 3.0 | 1.0 | 1.0 | 1.0 | 1.5 | 0.9 |
+`stat_score` is the UmaTools / umakonga lookup ([rating system](https://daftuyda.moe/guides/rating-system#2-stat-scoring)): raw per-point rates in 50-point blocks from 0 to 1200, accumulated, then `round(raw / 10)` the same way JavaScript `Math.round` does (halves away from zero). The displayed score at 1200 is 3,841. Stats stay clipped to `[0, 1200]`; the 1201–2500 bands are unused.
 
-Energy changes are not scored. A failed training scores its clipped −10 as negative reward (failed speed at 0 speed scores 0, not −30).
+| Stat | 0 | 50 | 100 | 200 | 400 | 600 | 800 | 1000 | 1200 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Score | 0 | 25 | 66 | 181 | 577 | 1,143 | 1,808 | 2,635 | 3,841 |
+
+A failed training scores the lookup drop on the clipped −10 (failed speed at 0 speed scores 0).
+
+`min_utility` is −sum of `stat_score(initial)` on the five stats (default deck −57). `max_utility` is filling every capped stat from its initial lookup value, plus the 1.3 × rainbow skill-point ceiling (`5 × 3841 − 57 + 1.3 × 42 × 72 = 23079.2` on the default deck).
 
 ## Turn structure
 
