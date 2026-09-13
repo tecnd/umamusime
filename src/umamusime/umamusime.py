@@ -76,7 +76,7 @@ _GAME_INFO = pyspiel.GameInfo(
 )
 
 # Score per point of (speed, stamina, power, guts, wit, skill points) gained.
-_STAT_WEIGHTS = (3.0, 1.0, 1.0, 1.0, 1.5, 0.9)
+_STAT_WEIGHTS = (2.6, 2.6, 2.6, 2.6, 2.6, 1.3)
 
 # Facility levels 1–5. Rest is not a facility; its row is unused.
 # Each entry is (speed, stamina, power, guts, wit, skill points) before support

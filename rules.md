@@ -14,9 +14,9 @@ Score is the sum of per-turn rewards. Each turn's reward is the weighted sum of 
 
 | Stat | Speed | Stamina | Power | Guts | Wit | Skill points |
 | --- | --- | --- | --- | --- | --- | --- |
-| Weight | 3.0 | 1.0 | 1.0 | 1.0 | 1.5 | 0.9 |
+| Weight | 2.6 | 2.6 | 2.6 | 2.6 | 2.6 | 1.3 |
 
-Energy changes are not scored. A failed training scores its clipped −10 as negative reward (failed speed at 0 speed scores 0, not −30).
+Energy changes are not scored. A failed training scores its clipped −10 as negative reward (failed speed at 0 speed scores 0, not −26).
 
 ## Turn structure
 
