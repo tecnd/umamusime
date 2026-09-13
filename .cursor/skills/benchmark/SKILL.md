@@ -5,7 +5,7 @@ description: Run Random, truncated MCTS, and DQN on Umamusime, print each method
 
 # Benchmark Random, MCTS, and DQN
 
-Compare OpenSpiel's uniform random bot, truncated MCTS search, and DQN on a full 72-turn (3-year) Umamusime game.
+Compare OpenSpiel's uniform random bot, truncated MCTS search, and DQN on Mihono Bourbon's 72-turn (3-year) Umamusime career. Year 3 Late April is the Tenno Sho (Spring): under 400 speed or 400 stamina ends the run as a soft fail.
 
 ## Instructions
 
@@ -21,10 +21,11 @@ uv run python -m umamusime.compare
    - The reward of every run, and which run was best
    - Final state of the **best** (highest-reward) run
    - Reward of that best run
+   - Whether that best run **finished normally** or ended in a **Tenno Sho (Spring) soft fail**
    - Actions of that best run, in order, named with `state.action_to_string`
 
 3. For each method, write **one sentence** summarizing the chosen rest/training strategy from that **best** run's action sequence. Do not count actions programmatically or reuse a canned template. Do not summarize the discarded runs.
 
-4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, and your one-sentence summary. Do not re-run the play loops.
+4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, whether it finished normally or soft-failed the Tenno Sho (Spring), and your one-sentence summary. Do not re-run the play loops.
 
 Do not reimplement the bots. `umamusime.compare` calls `umamusime.random_bot.play` (OpenSpiel `UniformRandomBot`), `umamusime.mcts_truncated.play`, `umamusime.dqn.train`, and `umamusime.dqn.play`. The original full-rollout bot stays at `umamusime.mcts.play` and is not part of this benchmark.
