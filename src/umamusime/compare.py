@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 
-from . import dqn, mcts
+from . import dqn, mcts, random_bot
 from .umamusime import UmaGame, UmaState
 
 _RUNS = 3
@@ -45,6 +45,11 @@ def _report(
 
 def main() -> None:
     print("Deck: " + ", ".join(card.name for card in UmaGame().cards) + "\n")
+
+    random_state, random_actions, random_scores, random_best = _best_of(
+        lambda index: random_bot.play(verbose=False, seed=_SEED + index)
+    )
+    _report("Random", random_state, random_actions, random_scores, random_best)
 
     mcts_run_s: list[float] = []
 
