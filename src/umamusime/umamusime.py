@@ -175,6 +175,11 @@ _FAIL_CHANCE_AT_ZERO = 0.99
 _CHANCE_FAIL = 0
 _CHANCE_SUCCESS = 1
 
+_PLACEMENT_ACTIONS = tuple(range(_NUM_PLACEMENT_OUTCOMES))
+_RESULT_ACTIONS = (_CHANCE_FAIL, _CHANCE_SUCCESS)
+_DECISION_ACTIONS = tuple(range(_GAME_INFO.num_distinct_actions))
+
+
 class _Phase(IntEnum):
     PLACEMENT = auto()
     DECISION = auto()
@@ -211,12 +216,15 @@ def _is_summer_camp_turn(turn_1based: int) -> bool:
     return year in _SUMMER_CAMP_YEARS and month in _SUMMER_CAMP_MONTHS
 
 
+# Indexed by 1-based turn; index 0 is unused. Read on every training, so it is
+# worth keeping out of the calendar arithmetic above.
+_SUMMER_CAMP_TURNS = (False,) + tuple(
+    _is_summer_camp_turn(turn) for turn in range(1, _MAX_TURNS + 1)
+)
+
+
 def _clip_energy(energy: int) -> int:
     return max(0, min(_MAX_ENERGY, energy))
-
-
-def _clip_stat(value: int) -> int:
-    return max(_MIN_STAT, min(_MAX_STAT, value))
 
 
 def _facility_level(uses: int) -> int:
@@ -400,10 +408,10 @@ class UmaState(pyspiel.State):
 
     def legal_actions(self, player=None):
         if self._phase == _Phase.PLACEMENT:
-            return list(range(_NUM_PLACEMENT_OUTCOMES))
+            return list(_PLACEMENT_ACTIONS)
         if self._phase == _Phase.RESULT:
-            return [_CHANCE_FAIL, _CHANCE_SUCCESS]
-        return [a for a in range(_GAME_INFO.num_distinct_actions)]
+            return list(_RESULT_ACTIONS)
+        return list(_DECISION_ACTIONS)
 
     def _permanent_facility_level_for(self, action: int) -> int:
         return _facility_level(self._facility_uses[action - 1])
@@ -496,7 +504,16 @@ class UmaState(pyspiel.State):
             self._guts,
             self._wit,
         )
-        after = tuple(_clip_stat(old + gain) for old, gain in zip(before, gains))
+        after = []
+        deltas = []
+        for old, gain in zip(before, gains):
+            new = old + gain
+            if new < _MIN_STAT:
+                new = _MIN_STAT
+            elif new > _MAX_STAT:
+                new = _MAX_STAT
+            after.append(new)
+            deltas.append(new - old)
         (
             self._speed,
             self._stamina,
@@ -505,7 +522,8 @@ class UmaState(pyspiel.State):
             self._wit,
         ) = after
         self._skill_points += gains[5]
-        return tuple(new - old for new, old in zip(after, before)) + (gains[5],)
+        deltas.append(gains[5])
+        return tuple(deltas)
 
     def _apply_training_result(self, action: int, success: bool) -> None:
         if success:
@@ -518,12 +536,13 @@ class UmaState(pyspiel.State):
                 self._facility_uses = tuple(uses)
                 card_states = list(self._card_states)
                 for index in self._attending(action):
-                    card_states[index] = card_states[index]._replace(
-                        friendship=min(
+                    card_state = card_states[index]
+                    card_states[index] = CardState(
+                        min(
                             _MAX_FRIENDSHIP,
-                            card_states[index].friendship
-                            + _FRIENDSHIP_PER_TRAINING,
-                        )
+                            card_state.friendship + _FRIENDSHIP_PER_TRAINING,
+                        ),
+                        card_state.placement,
                     )
                 self._card_states = tuple(card_states)
         else:
@@ -541,7 +560,7 @@ class UmaState(pyspiel.State):
 
     def _begin_turn(self) -> None:
         self._card_states = tuple(
-            card_state._replace(placement=_PLACEMENT_AWAY)
+            CardState(card_state.friendship, _PLACEMENT_AWAY)
             for card_state in self._card_states
         )
         self._placement_index = 0
@@ -551,13 +570,12 @@ class UmaState(pyspiel.State):
         if self._phase == _Phase.PLACEMENT:
             if action not in range(_NUM_PLACEMENT_OUTCOMES):
                 raise ValueError(f"Invalid placement outcome: {action}")
+            index = self._placement_index
             card_states = list(self._card_states)
-            card_states[self._placement_index] = card_states[
-                self._placement_index
-            ]._replace(placement=action)
+            card_states[index] = CardState(card_states[index].friendship, action)
             self._card_states = tuple(card_states)
-            self._placement_index += 1
-            if self._placement_index == _NUM_CARDS:
+            self._placement_index = index + 1
+            if index + 1 == _NUM_CARDS:
                 self._phase = _Phase.DECISION
             return
 
@@ -592,7 +610,7 @@ class UmaState(pyspiel.State):
         return self._turn + 1
 
     def is_summer_camp(self) -> bool:
-        return _is_summer_camp_turn(self._current_turn_1based())
+        return _SUMMER_CAMP_TURNS[self._current_turn_1based()]
 
     def rewards(self):
         return [self._last_reward]
