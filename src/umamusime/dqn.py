@@ -7,7 +7,11 @@ from open_spiel.python.pytorch import dqn
 
 from .umamusime import UmaGame, UmaState, _MAX_TURNS
 
-_TRAINING_EPISODES = 600
+# 600 episodes leaves the greedy policy short of the speed/wit line the
+# network is clearly able to learn; 1500 is where a sweep of 600–10000
+# plateaued (mean ~4940 on the three compare seeds). Longer runs cost
+# minutes and bounce around the same band.
+_TRAINING_EPISODES = 1500
 _EVAL_EVERY = 200
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
 
