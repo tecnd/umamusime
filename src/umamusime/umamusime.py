@@ -67,9 +67,6 @@ _NUM_PLACEMENT_OUTCOMES = 6
 _NODES_PER_TURN = _NUM_CARDS + 2
 _NUM_ACTIONS = 6
 
-# Score per point of (speed, stamina, power, guts, wit, skill points) gained.
-_STAT_WEIGHTS = (2.6, 2.6, 2.6, 2.6, 2.6, 1.3)
-
 # Facility levels 1–5. Rest is not a facility; its row is unused.
 # Each entry is (speed, stamina, power, guts, wit, skill points) before support
 # card bonuses, on a successful training.
@@ -160,6 +157,72 @@ _MAX_ENERGY = 100
 _STARTING_ENERGY = _MAX_ENERGY
 _MIN_STAT = 0
 _MAX_STAT = 1200
+
+# Skill points still score a flat 1.3 per landed point. The five training
+# stats use the UmaTools / umakonga lookup: raw per-point rates in 50-point
+# blocks, accumulated, then round(raw / 10). We only need 0-1200 while the
+# game cap stays there. https://daftuyda.moe/guides/rating-system#2-stat-scoring
+_SKILL_POINT_WEIGHT = 1.3
+_STAT_RAW_RATES = (
+    5,
+    8,
+    10,
+    13,
+    16,
+    18,
+    21,
+    24,
+    26,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    39,
+    41,
+    42,
+    43,
+    52,
+    55,
+    66,
+    68,
+    68,
+)
+
+
+def _js_round(value: float) -> int:
+    """JavaScript Math.round: halves away from zero, not banker's rounding."""
+    return int(value + 0.5) if value >= 0 else int(value - 0.5)
+
+
+def _build_stat_scores() -> tuple[int, ...]:
+    scores = [0]
+    raw = 0
+    index = 0
+    for stat in range(1, _MAX_STAT + 1):
+        if stat <= 49:
+            index = 0
+        elif stat <= 99:
+            index = 1
+        elif stat % 50 == 0:
+            index += 1
+        raw += _STAT_RAW_RATES[index]
+        scores.append(_js_round(raw / 10.0))
+    return tuple(scores)
+
+
+_STAT_SCORES = _build_stat_scores()
+
+
+def _stat_score(value: int) -> int:
+    if value <= _MIN_STAT:
+        return _STAT_SCORES[0]
+    if value >= _MAX_STAT:
+        return _STAT_SCORES[_MAX_STAT]
+    return _STAT_SCORES[value]
+
 
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
@@ -300,28 +363,28 @@ def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
     return best
 
 
-def _min_utility() -> float:
-    """Lowest possible return: a full −10 fail landing every turn."""
-    worst_fail = min(
-        sum(weight * delta for weight, delta in zip(_STAT_WEIGHTS, row))
-        for row in _FAIL_STATS
-    )
-    return worst_fail * _MAX_TURNS
+def _min_utility(cards: Sequence[SupportCard]) -> float:
+    """Lowest possible return: fail every initial stat down to 0.
+
+    Five-stat score is a function of the current value, so a career cannot
+    go below −sum(stat_score(initial)). Skill points never decrease.
+    """
+    initials = _summed_initial_stats(cards)
+    return -sum(_stat_score(initials[index]) for index in range(5))
 
 
 def _max_utility(cards: Sequence[SupportCard]) -> float:
     """Highest possible return for this deck.
 
-    Each of the five capped stats can score at most the gap from its initial
-    value to 1200. Skill points are uncapped; the bound is the same all-cards-
-    attend rainbow ceiling already used for the observation scale.
+    Each of the five capped stats scores at most stat_score(1200) minus its
+    initial lookup value. Skill points keep the flat 1.3 weight times the
+    all-cards-attend rainbow ceiling already used for the observation scale.
     """
     initials = _summed_initial_stats(cards)
     five = sum(
-        weight * max(0, _MAX_STAT - initial)
-        for weight, initial in zip(_STAT_WEIGHTS[:5], initials[:5])
+        _stat_score(_MAX_STAT) - _stat_score(initials[index]) for index in range(5)
     )
-    skill = _STAT_WEIGHTS[5] * _max_skill_points_per_turn(cards) * _MAX_TURNS
+    skill = _SKILL_POINT_WEIGHT * _max_skill_points_per_turn(cards) * _MAX_TURNS
     return five + skill
 
 
@@ -330,7 +393,7 @@ def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
         num_distinct_actions=_NUM_ACTIONS,
         max_chance_outcomes=_NUM_PLACEMENT_OUTCOMES,
         num_players=1,
-        min_utility=_min_utility(),
+        min_utility=_min_utility(cards),
         max_utility=_max_utility(cards),
         max_game_length=_MAX_TURNS * _NODES_PER_TURN,
     )
@@ -577,10 +640,24 @@ class UmaState(pyspiel.State):
         else:
             gains = _FAIL_STATS[action]
 
-        applied = self._apply_stats(gains)
-        self._last_reward = sum(
-            weight * delta for weight, delta in zip(_STAT_WEIGHTS, applied)
+        before = (
+            self._speed,
+            self._stamina,
+            self._power,
+            self._guts,
+            self._wit,
         )
+        applied = self._apply_stats(gains)
+        after = (
+            self._speed,
+            self._stamina,
+            self._power,
+            self._guts,
+            self._wit,
+        )
+        self._last_reward = sum(
+            _stat_score(new) - _stat_score(old) for new, old in zip(after, before)
+        ) + _SKILL_POINT_WEIGHT * applied[5]
         self._score += self._last_reward
 
         self._turn += 1
