@@ -65,15 +65,7 @@ _NUM_PLACEMENT_OUTCOMES = 6
 
 # A turn is six placement rolls, the player's action, then a fail/success roll.
 _NODES_PER_TURN = _NUM_CARDS + 2
-
-_GAME_INFO = pyspiel.GameInfo(
-    num_distinct_actions=6,
-    max_chance_outcomes=_NUM_PLACEMENT_OUTCOMES,
-    num_players=1,
-    min_utility=-5000.0,
-    max_utility=50000.0,
-    max_game_length=_MAX_TURNS * _NODES_PER_TURN,
-)
+_NUM_ACTIONS = 6
 
 # Score per point of (speed, stamina, power, guts, wit, skill points) gained.
 _STAT_WEIGHTS = (2.6, 2.6, 2.6, 2.6, 2.6, 1.3)
@@ -177,7 +169,7 @@ _CHANCE_SUCCESS = 1
 
 _PLACEMENT_ACTIONS = tuple(range(_NUM_PLACEMENT_OUTCOMES))
 _RESULT_ACTIONS = (_CHANCE_FAIL, _CHANCE_SUCCESS)
-_DECISION_ACTIONS = tuple(range(_GAME_INFO.num_distinct_actions))
+_DECISION_ACTIONS = tuple(range(_NUM_ACTIONS))
 
 
 class _Phase(IntEnum):
@@ -308,20 +300,57 @@ def _max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
     return best
 
 
+def _min_utility() -> float:
+    """Lowest possible return: a full −10 fail landing every turn."""
+    worst_fail = min(
+        sum(weight * delta for weight, delta in zip(_STAT_WEIGHTS, row))
+        for row in _FAIL_STATS
+    )
+    return worst_fail * _MAX_TURNS
+
+
+def _max_utility(cards: Sequence[SupportCard]) -> float:
+    """Highest possible return for this deck.
+
+    Each of the five capped stats can score at most the gap from its initial
+    value to 1200. Skill points are uncapped; the bound is the same all-cards-
+    attend rainbow ceiling already used for the observation scale.
+    """
+    initials = _summed_initial_stats(cards)
+    five = sum(
+        weight * max(0, _MAX_STAT - initial)
+        for weight, initial in zip(_STAT_WEIGHTS[:5], initials[:5])
+    )
+    skill = _STAT_WEIGHTS[5] * _max_skill_points_per_turn(cards) * _MAX_TURNS
+    return five + skill
+
+
+def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
+    return pyspiel.GameInfo(
+        num_distinct_actions=_NUM_ACTIONS,
+        max_chance_outcomes=_NUM_PLACEMENT_OUTCOMES,
+        num_players=1,
+        min_utility=_min_utility(),
+        max_utility=_max_utility(cards),
+        max_game_length=_MAX_TURNS * _NODES_PER_TURN,
+    )
+
+
 class UmaGame(pyspiel.Game):
     def __init__(self, params=None, *, reward_model=None):
         params = dict(params or {})
         params.setdefault("cards", deck_param())
+        cards = cards_from_param(str(params["cards"]))
+        if len(cards) != _NUM_CARDS:
+            raise ValueError(
+                f"Expected a deck of {_NUM_CARDS} support cards, "
+                f"got {len(cards)}"
+            )
         game_type = (
             _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
         )
-        super().__init__(game_type, _GAME_INFO, params)
-        self.cards = cards_from_param(str(params["cards"]))
-        if len(self.cards) != _NUM_CARDS:
-            raise ValueError(
-                f"Expected a deck of {_NUM_CARDS} support cards, "
-                f"got {len(self.cards)}"
-            )
+        super().__init__(game_type, _game_info(cards), params)
+        self.cards = cards
         self.placement_outcomes = tuple(
             _placement_outcomes(card) for card in self.cards
         )
@@ -586,7 +615,7 @@ class UmaState(pyspiel.State):
             )
             return
 
-        if action not in range(_GAME_INFO.num_distinct_actions):
+        if action not in range(_NUM_ACTIONS):
             raise ValueError(f"Invalid action: {action}")
 
         energy_after = _clip_energy(self._energy + self._energy_delta(action))
