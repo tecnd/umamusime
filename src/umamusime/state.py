@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pyspiel
 
+from . import training
 from .actions import (
     ACTION_NAMES,
     CHANCE_FAIL,
@@ -47,7 +48,6 @@ from .training import (
     TRAINING_STATS,
     UMA_GROWTH,
     clip_energy,
-    facility_level as facility_level_from_uses,
     stat_train_failure_chance,
     training_multiplier,
 )
@@ -152,7 +152,7 @@ class UmaState(pyspiel.State):
         return list(DECISION_ACTIONS)
 
     def _permanent_facility_level_for(self, action: int) -> int:
-        return facility_level_from_uses(self._facility_uses[action - 1])
+        return training.facility_level(self._facility_uses[action - 1])
 
     def facility_level(self, action: int) -> int:
         """Current facility level for a training action, including summer camp."""
