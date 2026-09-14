@@ -2,7 +2,7 @@
 
 ## Project
 
-Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. `rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes.
+Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. The project uses `uv` for Python, dependency, environment, and command management. `rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes.
 
 ## Setup and checks
 
