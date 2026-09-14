@@ -39,3 +39,14 @@ Useful entry points:
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
 - Seed NumPy/OpenSpiel paths when reproducibility matters. Do not commit generated `*.pt`, virtual environments, or build artifacts.
 - Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `rules.md` when rules, defaults, scoring, or known limitations change.
+
+## Cursor Cloud specific instructions
+
+Cloud Agent VMs can boot from a snapshot whose git checkout is behind GitHub. On first environment setup, pull the latest `master` before exploring or branching:
+
+```bash
+git fetch origin master
+git pull --ff-only origin master
+```
+
+If the session is already on a feature branch, fetch `origin/master` without switching away from that branch, then create new work from the updated `master`.
