@@ -8,11 +8,12 @@ Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-play
 
 ```bash
 uv sync
-uv run mypy --ignore-missing-imports src
+uv run ruff check src
+uv run ty check
 uv run python -c "from umamusime.game import UmaGame; print(UmaGame().new_initial_state())"
 ```
 
-There is currently no automated test suite. Run the type check and a focused smoke command for changed behavior. `uv run python -m umamusime.compare` is the full Random/truncated-MCTS/DQN benchmark; it is slow, always retrains DQN, and overwrites the ignored `dqn_checkpoint.pt`.
+There is currently no automated test suite. Run Ruff, ty, and a focused smoke command for changed behavior. `uv run python -m umamusime.compare` is the full Random/truncated-MCTS/DQN benchmark; it is slow, always retrains DQN, and overwrites the ignored `dqn_checkpoint.pt`.
 
 Useful entry points:
 
@@ -29,7 +30,7 @@ Useful entry points:
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation.
 - `src/umamusime/bots/` contains human, random, full/truncated MCTS, and DQN players; `compare.py` benchmarks selected bots.
-- `typings/pyspiel.pyi` supplies local OpenSpiel types for tools configured to use it and is excluded as project source.
+- `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
 ## Conventions and pitfalls
 
