@@ -2,7 +2,7 @@
 
 Single-player career, 72 turns over 3 years. Each turn is half a month: turn 1 is Year 1, Early January and turn 72 is Year 3, Late December.
 
-You start at 100 energy. Speed, stamina, power, guts, wit, and skill points start at 0, plus whatever the support deck grants as **initial {stat}**. The default deck therefore begins at 20 speed, 35 stamina, 55 wit. Those starting stats count toward score.
+You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `speed`, `stamina`, `power`, `guts`, and `wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 107 stamina, 92 power, 102 guts, 143 wit. Those starting stats count toward score.
 
 In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
 
@@ -12,7 +12,7 @@ Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy i
 
 ## Score
 
-Score is the sum of per-turn rewards plus the lookup of the deck's initial stats. Energy is not scored. Each of the five training stats contributes `stat_score(after) − stat_score(before)` on the turn it changes, so a career totals `stat_score(final)` per stat. Skill points still score a flat **1.3** per landed point.
+Score is the sum of per-turn rewards plus the lookup of the starting stats (OpenSpiel base params plus the deck's initial grants). Energy is not scored. Each of the five training stats contributes `stat_score(after) − stat_score(before)` on the turn it changes, so a career totals `stat_score(final)` per stat. Skill points still score a flat **1.3** per landed point.
 
 `stat_score` is the UmaTools / umakonga lookup ([rating system](https://daftuyda.moe/guides/rating-system#2-stat-scoring)): raw per-point rates in 50-point blocks from 0 to 1200, accumulated, then `round(raw / 10)` the same way JavaScript `Math.round` does (halves away from zero). The displayed score at 1200 is 3,841. Stats stay clipped to `[0, 1200]`; the 1201–2500 bands are unused.
 
@@ -57,7 +57,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the matching OpenSpiel params plus each card's initial grants; skill points are not parameterized. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 
