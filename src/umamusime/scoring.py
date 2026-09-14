@@ -1,11 +1,14 @@
 MIN_STAT = 0
 MAX_STAT = 1200
 
-# Skill points still score a flat 1.3 per landed point. The five training
-# stats use the UmaTools / umakonga lookup: raw per-point rates in 50-point
-# blocks, accumulated, then round(raw / 10). We only need 0-1200 while the
-# game cap stays there. https://daftuyda.moe/guides/rating-system#2-stat-scoring
-SKILL_POINT_WEIGHT = 1.3
+# Skill points are temporarily unweighted: wit training's extra skill-point
+# column was a reason to spam wit and walk into the Tenno Sho (Spring) fail,
+# and this isolates whether the five-stat lookup alone still prefers that.
+# The five training stats use the UmaTools / umakonga lookup: raw per-point
+# rates in 50-point blocks, accumulated, then round(raw / 10). We only need
+# 0-1200 while the game cap stays there.
+# https://daftuyda.moe/guides/rating-system#2-stat-scoring
+SKILL_POINT_WEIGHT = 0.0
 _STAT_RAW_RATES = (
     5,
     8,

@@ -45,9 +45,9 @@ def max_utility(cards: Sequence[SupportCard]) -> float:
     """Highest possible return for this deck.
 
     Each of the five capped stats scores at most stat_score(1200),
-    including the deck's initial grants. Skill points keep the flat 1.3
-    weight times the all-cards-attend rainbow ceiling already used for
-    the observation scale.
+    including the deck's initial grants. Skill points currently score 0,
+    so they add nothing; the observation scale still uses the rainbow
+    skill-point ceiling so a later weight can land without resizing it.
     """
     five = 5 * stat_score(MAX_STAT)
     skill = SKILL_POINT_WEIGHT * max_skill_points_per_turn(cards) * MAX_TURNS
