@@ -2,7 +2,7 @@
 
 Single-player career, 72 turns over 3 years. Each turn is half a month: turn 1 is Year 1, Early January and turn 72 is Year 3, Late December.
 
-You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `speed`, `stamina`, `power`, `guts`, and `wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 107 stamina, 92 power, 102 guts, 143 wit. Those starting stats count toward score.
+You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `initial_speed`, `initial_stamina`, `initial_power`, `initial_guts`, and `initial_wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 107 stamina, 92 power, 102 guts, 143 wit. Those starting stats count toward score.
 
 In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
 
@@ -57,7 +57,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the matching OpenSpiel params plus each card's initial grants; skill points are not parameterized. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the `initial_{stat}` OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`. Skill points always have 0 growth. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 
@@ -95,7 +95,7 @@ floor((BaseTraining + StatBonus)
       × (1 + UmaGrowth))
 ```
 
-- `BaseMood` is always 0.2. `UmaGrowth` is Mihono Bourbon's in-game rate: **0.2** on stamina, **0.1** on power, and **0** on every other stat (including skill points).
+- `BaseMood` is always 0.2. `UmaGrowth` is configurable through the `{stat}_growth` OpenSpiel params (`speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, `wit_growth`). The defaults are Mihono Bourbon's in-game rates: **0.2** on stamina, **0.1** on power, and **0** on speed, guts, and wit. Skill points always have 0 growth.
 - Sums and products run over the cards attending the chosen facility only.
 - `NumCharacters` is the number of cards on the chosen facility.
 - `FriendshipBonus` only counts for a card that is rainbowed **and** whose main stat matches the training; these multiply together.

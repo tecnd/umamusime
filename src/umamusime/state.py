@@ -46,7 +46,6 @@ from .training import (
     STARTING_ENERGY,
     TRAINING_ENERGY,
     TRAINING_STATS,
-    UMA_GROWTH,
     clip_energy,
     stat_train_failure_chance,
     training_multiplier,
@@ -218,12 +217,13 @@ class UmaState(pyspiel.State):
             len(attending),
         )
         # A stat bonus only applies to stats the training already grants.
-        # UmaGrowth is per-stat (Bourbon: 0.2 stamina, 0.1 power).
+        # UmaGrowth is per-stat (defaults: 0.2 stamina, 0.1 power);
+        # skill points always have 0 growth.
         return tuple(
             math.floor(
                 (amount + stat_bonus[index])
                 * multiplier
-                * (1.0 + UMA_GROWTH[index])
+                * (1.0 + self.get_game().uma_growth[index])
             )
             if amount
             else 0

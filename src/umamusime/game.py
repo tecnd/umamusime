@@ -4,22 +4,26 @@ import pyspiel
 
 from .actions import NODES_PER_TURN, NUM_ACTIONS, NUM_CARDS, NUM_PLACEMENT_OUTCOMES
 from .calendar import MAX_TURNS
-from .cards import TRAINABLE_STATS, SupportCard, cards_from_param, deck_param
+from .cards import SupportCard, cards_from_param, deck_param
 from .observer import UmaObserver
 from .scoring import MAX_STAT, SKILL_POINT_WEIGHT, stat_score
 from .state import UmaState
 from .training import (
     DEFAULT_INITIAL_STATS,
+    GROWTH_PARAMS,
+    INITIAL_STAT_PARAMS,
+    UMA_GROWTH,
     max_skill_points_per_turn,
     placement_outcomes,
     summed_initial_stats,
 )
 
 
-def _default_params() -> dict[str, str | int]:
+def _default_params() -> dict[str, str | int | float]:
     return {
         "cards": deck_param(),
-        **dict(zip(TRAINABLE_STATS, DEFAULT_INITIAL_STATS[:5], strict=True)),
+        **dict(zip(INITIAL_STAT_PARAMS, DEFAULT_INITIAL_STATS[:5], strict=True)),
+        **dict(zip(GROWTH_PARAMS, UMA_GROWTH[:5], strict=True)),
     }
 
 
@@ -87,15 +91,18 @@ class UmaGame(pyspiel.Game):
                 f"Expected a deck of {NUM_CARDS} support cards, "
                 f"got {len(cards)}"
             )
+        # Skill points always start at 0 and have 0 UmaGrowth.
+        uma_growth = tuple(float(params[name]) for name in GROWTH_PARAMS) + (0.0,)
         game_type = (
             _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
         )
         super().__init__(game_type, _game_info(cards), params)
         self.cards = cards
+        self.uma_growth = uma_growth
         self.placement_outcomes = tuple(
             placement_outcomes(card) for card in self.cards
         )
-        base = tuple(int(params[stat]) for stat in TRAINABLE_STATS) + (0,)
+        base = tuple(int(params[name]) for name in INITIAL_STAT_PARAMS) + (0,)
         self.initial_stats = summed_initial_stats(self.cards, base)
         self.skill_point_obs_scale = max(
             1, max_skill_points_per_turn(self.cards) * MAX_TURNS
