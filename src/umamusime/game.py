@@ -4,14 +4,15 @@ import pyspiel
 
 from .actions import NODES_PER_TURN, NUM_ACTIONS, NUM_CARDS, NUM_PLACEMENT_OUTCOMES
 from .calendar import MAX_TURNS
-from .cards import TRAINABLE_STATS, SupportCard, cards_from_param, deck_param
+from .cards import SupportCard, cards_from_param, deck_param
 from .observer import UmaObserver
 from .scoring import MAX_STAT, SKILL_POINT_WEIGHT, stat_score
 from .state import UmaState
 from .training import (
     DEFAULT_INITIAL_STATS,
+    GROWTH_PARAMS,
+    INITIAL_STAT_PARAMS,
     UMA_GROWTH,
-    UMA_GROWTH_PARAMS,
     max_skill_points_per_turn,
     placement_outcomes,
     summed_initial_stats,
@@ -21,8 +22,8 @@ from .training import (
 def _default_params() -> dict[str, str | int | float]:
     return {
         "cards": deck_param(),
-        **dict(zip(TRAINABLE_STATS, DEFAULT_INITIAL_STATS[:5], strict=True)),
-        **dict(zip(UMA_GROWTH_PARAMS, UMA_GROWTH, strict=True)),
+        **dict(zip(INITIAL_STAT_PARAMS, DEFAULT_INITIAL_STATS[:5], strict=True)),
+        **dict(zip(GROWTH_PARAMS, UMA_GROWTH[:5], strict=True)),
     }
 
 
@@ -52,10 +53,7 @@ def _make_game_type(
 _GAME_TYPE = _make_game_type()
 
 
-def max_utility(
-    cards: Sequence[SupportCard],
-    uma_growth: Sequence[float] = UMA_GROWTH,
-) -> float:
+def max_utility(cards: Sequence[SupportCard]) -> float:
     """Highest possible return for this deck.
 
     Each of the five capped stats scores at most stat_score(1200),
@@ -65,18 +63,11 @@ def max_utility(
     scale.
     """
     five = 5 * stat_score(MAX_STAT)
-    skill = (
-        SKILL_POINT_WEIGHT
-        * max_skill_points_per_turn(cards, uma_growth)
-        * MAX_TURNS
-    )
+    skill = SKILL_POINT_WEIGHT * max_skill_points_per_turn(cards) * MAX_TURNS
     return five + skill
 
 
-def _game_info(
-    cards: Sequence[SupportCard],
-    uma_growth: Sequence[float] = UMA_GROWTH,
-) -> pyspiel.GameInfo:
+def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
     # Five-stat lookup of the current value cannot go below 0; skill points
     # never decrease.
     return pyspiel.GameInfo(
@@ -84,7 +75,7 @@ def _game_info(
         max_chance_outcomes=NUM_PLACEMENT_OUTCOMES,
         num_players=1,
         min_utility=0.0,
-        max_utility=max_utility(cards, uma_growth),
+        max_utility=max_utility(cards),
         max_game_length=MAX_TURNS * NODES_PER_TURN,
     )
 
@@ -95,25 +86,26 @@ class UmaGame(pyspiel.Game):
         for key, value in _default_params().items():
             params.setdefault(key, value)
         cards = cards_from_param(str(params["cards"]))
-        uma_growth = tuple(float(params[name]) for name in UMA_GROWTH_PARAMS)
         if len(cards) != NUM_CARDS:
             raise ValueError(
                 f"Expected a deck of {NUM_CARDS} support cards, "
                 f"got {len(cards)}"
             )
+        # Skill points always start at 0 and have 0 UmaGrowth.
+        uma_growth = tuple(float(params[name]) for name in GROWTH_PARAMS) + (0.0,)
         game_type = (
             _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
         )
-        super().__init__(game_type, _game_info(cards, uma_growth), params)
+        super().__init__(game_type, _game_info(cards), params)
         self.cards = cards
         self.uma_growth = uma_growth
         self.placement_outcomes = tuple(
             placement_outcomes(card) for card in self.cards
         )
-        base = tuple(int(params[stat]) for stat in TRAINABLE_STATS) + (0,)
+        base = tuple(int(params[name]) for name in INITIAL_STAT_PARAMS) + (0,)
         self.initial_stats = summed_initial_stats(self.cards, base)
         self.skill_point_obs_scale = max(
-            1, max_skill_points_per_turn(self.cards, self.uma_growth) * MAX_TURNS
+            1, max_skill_points_per_turn(self.cards) * MAX_TURNS
         )
 
     def new_initial_state(self, state=None):

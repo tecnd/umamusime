@@ -217,7 +217,8 @@ class UmaState(pyspiel.State):
             len(attending),
         )
         # A stat bonus only applies to stats the training already grants.
-        # UmaGrowth is per-stat (Bourbon: 0.2 stamina, 0.1 power).
+        # UmaGrowth is per-stat (defaults: 0.2 stamina, 0.1 power);
+        # skill points always have 0 growth.
         return tuple(
             math.floor(
                 (amount + stat_bonus[index])

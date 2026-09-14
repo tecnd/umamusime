@@ -7,7 +7,7 @@ from .actions import (
     TRAINING_ACTIONS,
     TRAINING_FOR_STAT,
 )
-from .cards import SupportCard
+from .cards import TRAINABLE_STATS, SupportCard
 
 # Facility levels 1–5. Rest is not a facility; its row is unused.
 # Each entry is (speed, stamina, power, guts, wit, skill points) before support
@@ -86,16 +86,11 @@ FRIENDSHIP_PER_TRAINING = 5
 
 # Fixed inputs to the stat gain formula. UmaGrowth defaults to Mihono
 # Bourbon's in-game rates: +20% stamina, +10% power, nothing else.
+# Skill points are not parameterized and always have 0 growth.
 BASE_MOOD = 0.2
 UMA_GROWTH = (0.0, 0.2, 0.1, 0.0, 0.0, 0.0)
-UMA_GROWTH_PARAMS = tuple(f"uma_growth_{stat}" for stat in (
-    "speed",
-    "stamina",
-    "power",
-    "guts",
-    "wit",
-    "skill_points",
-))
+INITIAL_STAT_PARAMS = tuple(f"initial_{stat}" for stat in TRAINABLE_STATS)
+GROWTH_PARAMS = tuple(f"{stat}_growth" for stat in TRAINABLE_STATS)
 PER_CARD_BONUS = 0.05
 
 MAX_ENERGY = 100
@@ -170,14 +165,12 @@ def training_multiplier(
     )
 
 
-def max_skill_points_per_turn(
-    cards: Sequence[SupportCard],
-    uma_growth: Sequence[float] = UMA_GROWTH,
-) -> int:
+def max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
     """Upper bound on skill points from one successful training.
 
     Assumes every card in the deck attends and every matching card is
-    rainbowed — enough to keep the observation at most 1.
+    rainbowed — enough to keep the observation at most 1. Skill points
+    have no UmaGrowth term.
     """
     skill = STAT_INDEX["skill_points"]
     bonus = sum(card.stat_bonus.get("skill_points", 0) for card in cards)
@@ -199,7 +192,6 @@ def max_skill_points_per_turn(
                 training_effectiveness,
                 len(cards),
             )
-            * (1.0 + uma_growth[skill])
         )
         best = max(best, gain)
     return best
