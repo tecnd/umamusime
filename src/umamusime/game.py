@@ -4,15 +4,23 @@ import pyspiel
 
 from .actions import NODES_PER_TURN, NUM_ACTIONS, NUM_CARDS, NUM_PLACEMENT_OUTCOMES
 from .calendar import MAX_TURNS
-from .cards import SupportCard, cards_from_param, deck_param
+from .cards import TRAINABLE_STATS, SupportCard, cards_from_param, deck_param
 from .observer import UmaObserver
 from .scoring import MAX_STAT, SKILL_POINT_WEIGHT, stat_score
 from .state import UmaState
 from .training import (
+    DEFAULT_INITIAL_STATS,
     max_skill_points_per_turn,
     placement_outcomes,
     summed_initial_stats,
 )
+
+
+def _default_params() -> dict[str, str | int]:
+    return {
+        "cards": deck_param(),
+        **dict(zip(TRAINABLE_STATS, DEFAULT_INITIAL_STATS[:5], strict=True)),
+    }
 
 
 def _make_game_type(
@@ -32,7 +40,7 @@ def _make_game_type(
         provides_information_state_tensor=False,
         provides_observation_string=True,
         provides_observation_tensor=True,
-        parameter_specification={"cards": deck_param()},
+        parameter_specification=_default_params(),
     )
 
 
@@ -45,9 +53,10 @@ def max_utility(cards: Sequence[SupportCard]) -> float:
     """Highest possible return for this deck.
 
     Each of the five capped stats scores at most stat_score(1200),
-    including the deck's initial grants. Skill points keep the flat 1.3
-    weight times the all-cards-attend rainbow ceiling already used for
-    the observation scale.
+    including the parameterized base stats and the deck's initial
+    grants. Skill points keep the flat 1.3 weight times the
+    all-cards-attend rainbow ceiling already used for the observation
+    scale.
     """
     five = 5 * stat_score(MAX_STAT)
     skill = SKILL_POINT_WEIGHT * max_skill_points_per_turn(cards) * MAX_TURNS
@@ -70,7 +79,8 @@ def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
 class UmaGame(pyspiel.Game):
     def __init__(self, params=None, *, reward_model=None):
         params = dict(params or {})
-        params.setdefault("cards", deck_param())
+        for key, value in _default_params().items():
+            params.setdefault(key, value)
         cards = cards_from_param(str(params["cards"]))
         if len(cards) != NUM_CARDS:
             raise ValueError(
@@ -85,7 +95,8 @@ class UmaGame(pyspiel.Game):
         self.placement_outcomes = tuple(
             placement_outcomes(card) for card in self.cards
         )
-        self.initial_stats = summed_initial_stats(self.cards)
+        base = tuple(int(params[stat]) for stat in TRAINABLE_STATS) + (0,)
+        self.initial_stats = summed_initial_stats(self.cards, base)
         self.skill_point_obs_scale = max(
             1, max_skill_points_per_turn(self.cards) * MAX_TURNS
         )

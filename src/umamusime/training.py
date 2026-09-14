@@ -93,6 +93,10 @@ PER_CARD_BONUS = 0.05
 MAX_ENERGY = 100
 STARTING_ENERGY = MAX_ENERGY
 
+# Character base stats before support-card initial grants. Skill points
+# are not an OpenSpiel param and always start at 0.
+DEFAULT_INITIAL_STATS = (96, 72, 92, 102, 88, 0)
+
 _FAIL_FREE_ENERGY = 50
 _FAIL_CHANCE_AT_ZERO = 0.99
 
@@ -128,8 +132,16 @@ def placement_outcomes(card: SupportCard) -> list[tuple[int, float]]:
     return [(outcome, weight / total) for outcome, weight in enumerate(weights)]
 
 
-def summed_initial_stats(cards: Sequence[SupportCard]) -> tuple[int, ...]:
-    totals = [0] * NUM_STATS
+def summed_initial_stats(
+    cards: Sequence[SupportCard],
+    base: Sequence[int] = DEFAULT_INITIAL_STATS,
+) -> tuple[int, ...]:
+    """Starting stats: OpenSpiel base params plus each card's initial grants."""
+    totals = list(base)
+    if len(totals) != NUM_STATS:
+        raise ValueError(
+            f"Expected {NUM_STATS} base stats, got {len(totals)}"
+        )
     for card in cards:
         for stat, amount in card.initial_stats.items():
             totals[STAT_INDEX[stat]] += amount
