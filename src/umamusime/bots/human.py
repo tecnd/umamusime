@@ -9,14 +9,20 @@ def play() -> UmaState:
     game = UmaGame()
     state: UmaState = game.new_initial_state()
     bot = HumanBot()
-    while not state.is_terminal():
-        if state.is_chance_node():
-            outcomes, probs = zip(*state.chance_outcomes())
-            action = np.random.choice(outcomes, p=probs)
-        else:
-            print(state)
-            action = bot.step(state)
-        state.apply_action(action)
+    try:
+        while not state.is_terminal():
+            if state.is_chance_node():
+                outcomes, probs = zip(*state.chance_outcomes())
+                action = np.random.choice(outcomes, p=probs)
+            else:
+                print(state)
+                action = bot.step(state)
+            state.apply_action(action)
+    except KeyboardInterrupt:
+        print("\nInterrupted — exiting.")
+        print(state)
+        print(f"Returns so far: {state.returns()}")
+        return state
     print(state)
     print(f"Returns: {state.returns()}")
     return state
