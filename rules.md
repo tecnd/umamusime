@@ -1,12 +1,12 @@
 # Umamusime
 
-Single-player career, 72 turns over 3 years. Each turn is half a month: turn 1 is Year 1, Early January and turn 72 is Year 3, Late December.
+Single-player career, 72 turns over 3 years. Each turn is half a month: turn 0 is Year 1, Early January and turn 71 is Year 3, Late December.
 
 You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `initial_speed`, `initial_stamina`, `initial_power`, `initial_guts`, and `initial_wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 107 stamina, 92 power, 102 guts, 143 wit. Those starting stats count toward score.
 
 In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
 
-Year 3 Late April (turn 56) is the **Tenno Sho (Spring)**, not a training turn. If speed or stamina is below 400 when that turn arrives, the run is a **soft fail** and ends immediately. Passing the check skips training for that half-month and the career continues at Year 3 Early May.
+Year 3 Late April (turn 55) is the **Tenno Sho (Spring)**, not a training turn. If speed or stamina is below 400 when that turn arrives, the run is a **soft fail** and ends immediately. Passing the check skips training for that half-month and the career continues at Year 3 Early May.
 
 Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy is clipped to `[0, 100]`. Skill points are not capped. There is no dedicated skill-point training.
 

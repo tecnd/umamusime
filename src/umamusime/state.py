@@ -321,7 +321,7 @@ class UmaState(pyspiel.State):
     def _begin_turn(self) -> None:
         if self._turn >= MAX_TURNS or self._soft_failed:
             return
-        if self._turn + 1 == TENNO_SHO_SPRING_TURN:
+        if self._turn == TENNO_SHO_SPRING_TURN:
             self._resolve_tenno_sho_spring()
             return
         self._card_states = tuple(
@@ -383,13 +383,14 @@ class UmaState(pyspiel.State):
     def ended_by_tenno_sho_fail(self) -> bool:
         return self._soft_failed
 
-    def _current_turn_1based(self) -> int:
+    def _display_turn(self) -> int:
+        """0-based turn shown in labels; terminal states show the last consumed turn."""
         if self.is_terminal():
-            return self._turn if self._turn > 0 else 1
-        return self._turn + 1
+            return max(self._turn - 1, 0)
+        return self._turn
 
     def is_summer_camp(self) -> bool:
-        return SUMMER_CAMP_TURNS[self._current_turn_1based()]
+        return SUMMER_CAMP_TURNS[self._display_turn()]
 
     def rewards(self):
         return [self._last_reward]
@@ -419,7 +420,7 @@ class UmaState(pyspiel.State):
 
     def __str__(self):
         career = (
-            f"{calendar_label(self._current_turn_1based())}, "
+            f"{calendar_label(self._display_turn())}, "
             f"Speed: {self._speed}, Stamina: {self._stamina}, "
             f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
             f"Skill points: {self._skill_points}, Energy: {self._energy}, "
