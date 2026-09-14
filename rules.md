@@ -57,7 +57,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the matching OpenSpiel params plus each card's initial grants; skill points are not parameterized. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the matching OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `uma_growth_speed`, `uma_growth_stamina`, `uma_growth_power`, `uma_growth_guts`, `uma_growth_wit`, and `uma_growth_skill_points`. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 
@@ -95,7 +95,7 @@ floor((BaseTraining + StatBonus)
       × (1 + UmaGrowth))
 ```
 
-- `BaseMood` is always 0.2. `UmaGrowth` is Mihono Bourbon's in-game rate: **0.2** on stamina, **0.1** on power, and **0** on every other stat (including skill points).
+- `BaseMood` is always 0.2. `UmaGrowth` is configurable through the `uma_growth_{stat}` OpenSpiel params. The defaults are Mihono Bourbon's in-game rates: **0.2** on stamina, **0.1** on power, and **0** on every other stat (including skill points).
 - Sums and products run over the cards attending the chosen facility only.
 - `NumCharacters` is the number of cards on the chosen facility.
 - `FriendshipBonus` only counts for a card that is rainbowed **and** whose main stat matches the training; these multiply together.

@@ -84,10 +84,18 @@ MAX_FRIENDSHIP = 100
 RAINBOW_FRIENDSHIP = 80
 FRIENDSHIP_PER_TRAINING = 5
 
-# Fixed inputs to the stat gain formula. UmaGrowth is Mihono Bourbon's
-# in-game rate: +20% stamina, +10% power, nothing else.
+# Fixed inputs to the stat gain formula. UmaGrowth defaults to Mihono
+# Bourbon's in-game rates: +20% stamina, +10% power, nothing else.
 BASE_MOOD = 0.2
 UMA_GROWTH = (0.0, 0.2, 0.1, 0.0, 0.0, 0.0)
+UMA_GROWTH_PARAMS = tuple(f"uma_growth_{stat}" for stat in (
+    "speed",
+    "stamina",
+    "power",
+    "guts",
+    "wit",
+    "skill_points",
+))
 PER_CARD_BONUS = 0.05
 
 MAX_ENERGY = 100
@@ -162,7 +170,10 @@ def training_multiplier(
     )
 
 
-def max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
+def max_skill_points_per_turn(
+    cards: Sequence[SupportCard],
+    uma_growth: Sequence[float] = UMA_GROWTH,
+) -> int:
     """Upper bound on skill points from one successful training.
 
     Assumes every card in the deck attends and every matching card is
@@ -188,6 +199,7 @@ def max_skill_points_per_turn(cards: Sequence[SupportCard]) -> int:
                 training_effectiveness,
                 len(cards),
             )
+            * (1.0 + uma_growth[skill])
         )
         best = max(best, gain)
     return best

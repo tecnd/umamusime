@@ -46,7 +46,6 @@ from .training import (
     STARTING_ENERGY,
     TRAINING_ENERGY,
     TRAINING_STATS,
-    UMA_GROWTH,
     clip_energy,
     stat_train_failure_chance,
     training_multiplier,
@@ -223,7 +222,7 @@ class UmaState(pyspiel.State):
             math.floor(
                 (amount + stat_bonus[index])
                 * multiplier
-                * (1.0 + UMA_GROWTH[index])
+                * (1.0 + self.get_game().uma_growth[index])
             )
             if amount
             else 0
