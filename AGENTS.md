@@ -8,7 +8,7 @@ Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-play
 
 ```bash
 uv sync
-uv run mypy src
+uv run mypy --ignore-missing-imports src
 uv run python -c "from umamusime.game import UmaGame; print(UmaGame().new_initial_state())"
 ```
 
@@ -29,7 +29,7 @@ Useful entry points:
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation.
 - `src/umamusime/bots/` contains human, random, full/truncated MCTS, and DQN players; `compare.py` benchmarks selected bots.
-- `typings/pyspiel.pyi` supplies local OpenSpiel types and is excluded from project checks.
+- `typings/pyspiel.pyi` supplies local OpenSpiel types for tools configured to use it and is excluded as project source.
 
 ## Conventions and pitfalls
 
