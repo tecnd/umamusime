@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-umamusime = "umamusime:main"
+umamusime = "umamusime.bots.human:main"
 
 [tool.ty.environment]
 extra-paths = ["./typings"]

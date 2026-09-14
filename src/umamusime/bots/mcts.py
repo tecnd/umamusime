@@ -1,15 +1,25 @@
 import numpy as np
-from open_spiel.python.bots.uniform_random import UniformRandomBot
+import pyspiel
+from open_spiel.python.algorithms import mcts
 
-from .game import UmaGame
-from .state import UmaState
+from ..game import UmaGame
+from ..state import UmaState
 
 
 def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
-    game = UmaGame()
+    # MCTSBot rejects non-TERMINAL reward_model, but that is only a metadata
+    # check. This game already implements returns() and the rest of the State
+    # API MCTS needs; per-turn rewards stay on the default game for DQN.
+    game = UmaGame(reward_model=pyspiel.GameType.RewardModel.TERMINAL)
     state: UmaState = game.new_initial_state()
     rng = np.random.RandomState(seed)
-    bot = UniformRandomBot(0, rng)
+    bot = mcts.MCTSBot(
+        game,
+        uct_c=2,
+        max_simulations=100,
+        evaluator=mcts.RandomRolloutEvaluator(n_rollouts=5, random_state=rng),
+        random_state=rng,
+    )
     player_actions: list[int] = []
     while not state.is_terminal():
         if state.is_chance_node():

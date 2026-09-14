@@ -28,4 +28,4 @@ uv run python -m umamusime.compare
 
 4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, whether it finished normally or soft-failed the Tenno Sho (Spring), and your one-sentence summary. Do not re-run the play loops.
 
-Do not reimplement the bots. `umamusime.compare` calls `umamusime.random_bot.play` (OpenSpiel `UniformRandomBot`), `umamusime.mcts_truncated.play`, `umamusime.dqn.train`, and `umamusime.dqn.play`. The original full-rollout bot stays at `umamusime.mcts.play` and is not part of this benchmark.
+Do not reimplement the bots. `umamusime.compare` calls `umamusime.bots.random_bot.play` (OpenSpiel `UniformRandomBot`), `umamusime.bots.mcts_truncated.play`, `umamusime.bots.dqn.train`, and `umamusime.bots.dqn.play`. The original full-rollout bot stays at `umamusime.bots.mcts.play` and is not part of this benchmark.

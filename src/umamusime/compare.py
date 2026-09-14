@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 
-from . import dqn, mcts_truncated, random_bot
+from .bots import dqn, mcts_truncated, random_bot
 from .game import UmaGame
 from .state import UmaState
 
