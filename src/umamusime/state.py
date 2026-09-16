@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pyspiel
+from tabulate import tabulate
 
 from . import training
 from .actions import (
@@ -89,9 +90,7 @@ class UmaState(pyspiel.State):
         self._placement_index = 0
         self._phase = Phase.PLACEMENT
 
-        self._score = float(
-            sum(stat_score(stat) for stat in game.initial_stats[:5])
-        )
+        self._score = float(sum(stat_score(stat) for stat in game.initial_stats[:5]))
         self._last_reward = 0.0
         self._pending_action: int | None = None
         self._soft_failed = False
@@ -201,9 +200,7 @@ class UmaState(pyspiel.State):
         stat_bonus = [0] * NUM_STATS
         for index in attending:
             card = cards[index]
-            if TRAINING_FOR_STAT[card.main_stat] == action and self._is_rainbow(
-                index
-            ):
+            if TRAINING_FOR_STAT[card.main_stat] == action and self._is_rainbow(index):
                 friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
             mood_effect += card.mood_effect
             training_effectiveness += card.training_effectiveness
@@ -309,9 +306,10 @@ class UmaState(pyspiel.State):
             self._guts,
             self._wit,
         )
-        self._last_reward = sum(
-            stat_score(new) - stat_score(old) for new, old in zip(after, before)
-        ) + SKILL_POINT_WEIGHT * applied[5]
+        self._last_reward = (
+            sum(stat_score(new) - stat_score(old) for new, old in zip(after, before))
+            + SKILL_POINT_WEIGHT * applied[5]
+        )
         self._score += self._last_reward
 
         self._turn += 1
@@ -334,10 +332,7 @@ class UmaState(pyspiel.State):
     def _resolve_tenno_sho_spring(self) -> None:
         # Year 3 Late April is the race, not a training turn.
         self._turn += 1
-        if (
-            self._speed < TENNO_SHO_MIN_SPEED
-            or self._stamina < TENNO_SHO_MIN_STAMINA
-        ):
+        if self._speed < TENNO_SHO_MIN_SPEED or self._stamina < TENNO_SHO_MIN_STAMINA:
             self._soft_failed = True
             return
         self._begin_turn()
@@ -398,45 +393,53 @@ class UmaState(pyspiel.State):
     def returns(self):
         return [self._score]
 
-    def _friendship_string(self) -> str:
+    def _support_lines_for(self, action: int) -> list[str]:
         cards = self.get_game().cards
-        return ", ".join(
-            f"{card.name} {card_state.friendship}"
-            for card, card_state in zip(cards, self._card_states)
-        )
-
-    def _placement_string(self) -> str:
-        cards = self.get_game().cards
-        by_place: dict[int, list[str]] = {}
-        for index in range(self._placement_index):
-            by_place.setdefault(self._card_states[index].placement, []).append(
-                cards[index].name
+        lines = []
+        for index in self._attending(action):
+            card = cards[index]
+            card_state = self._card_states[index]
+            prefix = (
+                "* "
+                if TRAINING_FOR_STAT[card.main_stat] == action
+                and self._is_rainbow(index)
+                else ""
             )
-        parts = []
-        for place, names in sorted(by_place.items()):
-            where = "away" if place == PLACEMENT_AWAY else ACTION_NAMES[place]
-            parts.append(f"{where}: {'/'.join(names)}")
-        return ", ".join(parts) if parts else "unrolled"
+            if card_state.friendship >= RAINBOW_FRIENDSHIP:
+                label = f"{card.name} (R)"
+            else:
+                label = f"{card.name} {card_state.friendship}"
+            lines.append(f"{prefix}{label}")
+        return lines
 
     def __str__(self):
-        career = (
-            f"{calendar_label(self._display_turn())}, "
-            f"Speed: {self._speed}, Stamina: {self._stamina}, "
-            f"Power: {self._power}, Guts: {self._guts}, Wit: {self._wit}, "
-            f"Skill points: {self._skill_points}, Energy: {self._energy}, "
-            f"Facilities: speed {self.facility_level(1)}, "
-            f"stamina {self.facility_level(2)}, "
-            f"power {self.facility_level(3)}, "
-            f"guts {self.facility_level(4)}, "
-            f"wit {self.facility_level(5)}"
+        lines = []
+        lines.append(f"{calendar_label(self._display_turn())}")
+        lines.append(f"Energy: {self._energy}")
+        training_cols = [
+            [f"Lv. {self.facility_level(action)}", stat, self._training_gains(action)]
+            for action, stat in enumerate(self.stats[:5], start=1)
+        ]
+        for action, col in enumerate(training_cols, start=1):
+            col.extend(self._support_lines_for(action))
+        lines.append(
+            tabulate(
+                {
+                    "Speed": training_cols[0],
+                    "Stamina": training_cols[1],
+                    "Power": training_cols[2],
+                    "Guts": training_cols[3],
+                    "Wit": training_cols[4],
+                },
+                headers="keys",
+                tablefmt="github",
+            )
         )
-        lines = [career, f"Friendship: {self._friendship_string()}"]
+        lines.append(f"Skill points: {self._skill_points}")
         if self._soft_failed:
             lines.append(
                 "Ended: Tenno Sho (Spring) soft fail "
                 f"(need {TENNO_SHO_MIN_SPEED} speed and "
                 f"{TENNO_SHO_MIN_STAMINA} stamina)"
             )
-        if not self.is_terminal():
-            lines.append(f"Supports: {self._placement_string()}")
         return "\n".join(lines)
