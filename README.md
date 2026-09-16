@@ -17,5 +17,4 @@ Umamusime is a simplified implementation of Umamusume in OpenSpiel/pyspiel to co
 
 ## Known issues
 
-* Failure rates for low energy are wrong
 * No races means careers can complete with impossible stat lines

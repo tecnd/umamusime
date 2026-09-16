@@ -28,7 +28,7 @@ A failed training scores the lookup drop on the clipped −10 (failed speed at 0
 
 1. Each of the six support cards independently rolls where it shows up (chance).
 2. You pick an action.
-3. Speed, stamina, power, and guts then roll fail/success (chance). Rest and wit never fail.
+3. Training actions then roll fail/success (chance). Rest never fails.
 
 ## Actions
 
@@ -41,7 +41,7 @@ Rest is not a facility. Training facilities start at level 1, gain a level after
 | Train stamina | −19…−25 | stamina / guts | 4 | Yes |
 | Train power | −20…−26 | stamina / power | 4 | Yes |
 | Train guts | −22…−28 | speed / power / guts | 4 | Yes |
-| Train wit | +5 | speed / wit | 5 | No |
+| Train wit | +5 | speed / wit | 5 | Yes (forgiving curve) |
 
 ### Training facilities
 
@@ -117,13 +117,19 @@ On wit training, each attending card that is already rainbowed adds its wit frie
 
 ## Failure
 
-Speed, stamina, power, and guts can fail. The fail chance uses energy **after** that training's current energy cost, not current energy.
+All training actions can fail. The fail chance uses energy **after** that training's current energy cost, not current energy. This value is **not** clipped to 0 before the formula (15 energy with a 20 cost → −5 → ~82.5% fail on speed/stamina/power/guts).
 
-- Remaining energy ≥ 50: 0% fail
-- Remaining energy 0: 99% fail
-- Between 0 and 50: linear from 99% to 0%
+**Speed, stamina, power, guts**
 
-On failure:
+- `fail% = -2.65 × energy_after + 69.3`, clipped to `[0, 100]`
+- At 0 energy after cost: 69.3% fail; at ~26 energy after cost: 0% fail
+
+**Wit** (more forgiving)
+
+- `fail_wit% = -2.54 × energy_after + 90`, clipped to `[0, 100]`
+- At 0 energy after cost: 90% fail; at ~35 energy after cost: 0% fail
+
+On failure (speed, stamina, power, guts):
 
 - The turn is used
 - Energy is not spent
@@ -132,3 +138,11 @@ On failure:
 - The facility is not used (no level-up progress)
 - The training's named stat drops by 10 (failed guts → −10 guts), then clipped to `[0, 1200]`
 - Score is the weighted clipped loss
+
+On wit failure:
+
+- The turn is used
+- Energy is still restored (including rainbow wit friendship recovery)
+- No stats or skill points are gained or lost
+- No friendship is gained
+- The facility is not used (no level-up progress)

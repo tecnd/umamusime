@@ -23,7 +23,6 @@ from .actions import (
     RESULT_ACTIONS,
     RESULT_NAMES,
     STAT_INDEX,
-    STAT_TRAIN_ACTIONS,
     TRAINING_ACTIONS,
     TRAINING_FOR_STAT,
     WIT_ACTION,
@@ -48,7 +47,7 @@ from .training import (
     TRAINING_ENERGY,
     TRAINING_STATS,
     clip_energy,
-    stat_train_failure_chance,
+    train_failure_chance,
     training_multiplier,
 )
 
@@ -186,6 +185,10 @@ class UmaState(pyspiel.State):
             delta += self._wit_energy_recovery()
         return delta
 
+    def _failure_probability(self, action: int) -> float:
+        energy_after = self._energy + self._energy_delta(action)
+        return train_failure_chance(action, energy_after)
+
     def _training_gains(self, action: int) -> tuple[int, ...]:
         """Stat gains of a successful training, including support card effects."""
         if action == REST_ACTION:
@@ -232,10 +235,7 @@ class UmaState(pyspiel.State):
         if self._phase == Phase.PLACEMENT:
             return self.get_game().placement_outcomes[self._placement_index]
         assert self._pending_action is not None
-        energy_after = clip_energy(
-            self._energy + self._energy_delta(self._pending_action)
-        )
-        p_fail = stat_train_failure_chance(energy_after)
+        p_fail = self._failure_probability(self._pending_action)
         return [(CHANCE_FAIL, p_fail), (CHANCE_SUCCESS, 1.0 - p_fail)]
 
     def _apply_stats(self, gains: Sequence[int]) -> tuple[int, ...]:
@@ -269,27 +269,26 @@ class UmaState(pyspiel.State):
         return tuple(deltas)
 
     def _apply_training_result(self, action: int, success: bool) -> None:
-        if success:
-            gains = self._training_gains(action)
+        if success or action == WIT_ACTION:
             # Energy recovery is read before friendships move this turn.
             self._energy = clip_energy(self._energy + self._energy_delta(action))
-            if action in TRAINING_ACTIONS:
-                uses = list(self._facility_uses)
-                uses[action - 1] += 1
-                self._facility_uses = tuple(uses)
-                card_states = list(self._card_states)
-                for index in self._attending(action):
-                    card_state = card_states[index]
-                    card_states[index] = CardState(
-                        min(
-                            MAX_FRIENDSHIP,
-                            card_state.friendship + FRIENDSHIP_PER_TRAINING,
-                        ),
-                        card_state.placement,
-                    )
-                self._card_states = tuple(card_states)
-        else:
-            gains = FAIL_STATS[action]
+
+        gains = self._training_gains(action) if success else FAIL_STATS[action]
+        if success and action in TRAINING_ACTIONS:
+            uses = list(self._facility_uses)
+            uses[action - 1] += 1
+            self._facility_uses = tuple(uses)
+            card_states = list(self._card_states)
+            for index in self._attending(action):
+                card_state = card_states[index]
+                card_states[index] = CardState(
+                    min(
+                        MAX_FRIENDSHIP,
+                        card_state.friendship + FRIENDSHIP_PER_TRAINING,
+                    ),
+                    card_state.placement,
+                )
+            self._card_states = tuple(card_states)
 
         before = (
             self._speed,
@@ -360,17 +359,12 @@ class UmaState(pyspiel.State):
         if action not in range(NUM_ACTIONS):
             raise ValueError(f"Invalid action: {action}")
 
-        energy_after = clip_energy(self._energy + self._energy_delta(action))
-        fail_p = (
-            stat_train_failure_chance(energy_after)
-            if action in STAT_TRAIN_ACTIONS
-            else 0.0
-        )
-        if 0.0 < fail_p < 1.0:
+        p_fail = self._failure_probability(action)
+        if 0.0 < p_fail < 1.0:
             self._pending_action = action
             self._phase = Phase.RESULT
             return
-        self._apply_training_result(action, success=(fail_p == 0.0))
+        self._apply_training_result(action, success=(p_fail == 0.0))
 
     def is_terminal(self):
         return self._turn >= MAX_TURNS or self._soft_failed
