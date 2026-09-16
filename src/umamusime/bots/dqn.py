@@ -72,9 +72,7 @@ def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> Non
             )
 
 
-def train(
-    *, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT
-) -> float:
+def train(*, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT) -> float:
     """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
     env, agent = _make_env_and_agent()
     started = time.perf_counter()
