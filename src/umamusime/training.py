@@ -4,8 +4,10 @@ from collections.abc import Sequence
 from .actions import (
     NUM_STATS,
     STAT_INDEX,
+    STAT_TRAIN_ACTIONS,
     TRAINING_ACTIONS,
     TRAINING_FOR_STAT,
+    WIT_ACTION,
 )
 from .cards import TRAINABLE_STATS, SupportCard
 
@@ -100,8 +102,10 @@ STARTING_ENERGY = MAX_ENERGY
 # are not an OpenSpiel param and always start at 0.
 DEFAULT_INITIAL_STATS = (96, 72, 92, 102, 88, 0)
 
-_FAIL_FREE_ENERGY = 50
-_FAIL_CHANCE_AT_ZERO = 0.99
+STAT_FAIL_SLOPE = -2.65
+STAT_FAIL_INTERCEPT = 69.3
+WIT_FAIL_SLOPE = -2.54
+WIT_FAIL_INTERCEPT = 90.0
 
 
 def clip_energy(energy: int) -> int:
@@ -115,12 +119,17 @@ def facility_level(uses: int) -> int:
     )
 
 
-def stat_train_failure_chance(energy_after: int) -> float:
-    # Remaining energy >= 50 never fails; 0 is 99% fail; linear in between.
-    if energy_after >= _FAIL_FREE_ENERGY:
-        return 0.0
-    remaining = max(energy_after, 0)
-    return _FAIL_CHANCE_AT_ZERO * (_FAIL_FREE_ENERGY - remaining) / _FAIL_FREE_ENERGY
+def _linear_fail_chance(energy_after: int, slope: float, intercept: float) -> float:
+    # energy_after may be negative when cost exceeds current energy.
+    return max(0.0, min(1.0, (slope * energy_after + intercept) / 100.0))
+
+
+def train_failure_chance(action: int, energy_after: int) -> float:
+    if action == WIT_ACTION:
+        return _linear_fail_chance(energy_after, WIT_FAIL_SLOPE, WIT_FAIL_INTERCEPT)
+    if action in STAT_TRAIN_ACTIONS:
+        return _linear_fail_chance(energy_after, STAT_FAIL_SLOPE, STAT_FAIL_INTERCEPT)
+    return 0.0
 
 
 def placement_outcomes(card: SupportCard) -> list[tuple[int, float]]:
