@@ -120,11 +120,7 @@ def stat_train_failure_chance(energy_after: int) -> float:
     if energy_after >= _FAIL_FREE_ENERGY:
         return 0.0
     remaining = max(energy_after, 0)
-    return (
-        _FAIL_CHANCE_AT_ZERO
-        * (_FAIL_FREE_ENERGY - remaining)
-        / _FAIL_FREE_ENERGY
-    )
+    return _FAIL_CHANCE_AT_ZERO * (_FAIL_FREE_ENERGY - remaining) / _FAIL_FREE_ENERGY
 
 
 def placement_outcomes(card: SupportCard) -> list[tuple[int, float]]:
@@ -142,9 +138,7 @@ def summed_initial_stats(
     """Starting stats: OpenSpiel base params plus each card's initial grants."""
     totals = list(base)
     if len(totals) != NUM_STATS:
-        raise ValueError(
-            f"Expected {NUM_STATS} base stats, got {len(totals)}"
-        )
+        raise ValueError(f"Expected {NUM_STATS} base stats, got {len(totals)}")
     for card in cards:
         for stat, amount in card.initial_stats.items():
             totals[STAT_INDEX[stat]] += amount

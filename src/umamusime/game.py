@@ -88,8 +88,7 @@ class UmaGame(pyspiel.Game):
         cards = cards_from_param(str(params["cards"]))
         if len(cards) != NUM_CARDS:
             raise ValueError(
-                f"Expected a deck of {NUM_CARDS} support cards, "
-                f"got {len(cards)}"
+                f"Expected a deck of {NUM_CARDS} support cards, got {len(cards)}"
             )
         # Skill points always start at 0 and have 0 UmaGrowth.
         uma_growth = tuple(float(params[name]) for name in GROWTH_PARAMS) + (0.0,)
@@ -99,9 +98,7 @@ class UmaGame(pyspiel.Game):
         super().__init__(game_type, _game_info(cards), params)
         self.cards = cards
         self.uma_growth = uma_growth
-        self.placement_outcomes = tuple(
-            placement_outcomes(card) for card in self.cards
-        )
+        self.placement_outcomes = tuple(placement_outcomes(card) for card in self.cards)
         base = tuple(int(params[name]) for name in INITIAL_STAT_PARAMS) + (0,)
         self.initial_stats = summed_initial_stats(self.cards, base)
         self.skill_point_obs_scale = max(

@@ -42,8 +42,7 @@ def _report(
     else:
         print("Ended: finished normally")
     print(
-        "Actions: "
-        + ", ".join(state.action_to_string(0, action) for action in actions)
+        "Actions: " + ", ".join(state.action_to_string(0, action) for action in actions)
     )
     print()
 

@@ -39,6 +39,7 @@ Useful entry points:
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
 - Seed NumPy/OpenSpiel paths when reproducibility matters. Do not commit generated `*.pt`, virtual environments, or build artifacts.
 - Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `rules.md` when rules, defaults, scoring, or known limitations change.
+- Use `uv run ruff format src` to format the codebase.
 
 ## Cursor Cloud specific instructions
 

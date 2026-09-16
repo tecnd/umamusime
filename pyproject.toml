@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "dm-tree>=0.1.10",
     "open-spiel[full]>=2.0.2",
+    "tabulate>=0.10.0",
 ]
 
 [dependency-groups]
