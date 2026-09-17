@@ -2,6 +2,7 @@ import time
 from collections.abc import Callable
 
 from .bots import dqn, mcts_truncated, random_bot
+from .calendar import calendar_label
 from .game import UmaGame
 from .state import UmaState
 
@@ -20,6 +21,17 @@ def _best_of(play: PlayFn) -> tuple[UmaState, list[int], list[float], int]:
     best_index = max(range(_RUNS), key=lambda index: results[index][0])
     _, state, actions = results[best_index]
     return state, actions, scores, best_index
+
+
+def _format_training_fails(state: UmaState) -> str:
+    fails = state.training_failures
+    if not fails:
+        return "Training fails: none"
+    parts = [
+        f"{calendar_label(turn)} {state.action_to_string(0, action)}"
+        for turn, action in fails
+    ]
+    return f"Training fails: {len(fails)} ({', '.join(parts)})"
 
 
 def _report(
@@ -41,6 +53,7 @@ def _report(
         print("Ended: Tenno Sho (Spring) soft fail")
     else:
         print("Ended: finished normally")
+    print(_format_training_fails(state))
     print(
         "Actions: " + ", ".join(state.action_to_string(0, action) for action in actions)
     )

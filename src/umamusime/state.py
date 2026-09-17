@@ -93,10 +93,17 @@ class UmaState(pyspiel.State):
         self._last_reward = 0.0
         self._pending_action: int | None = None
         self._soft_failed = False
+        # (turn, action) for each failed training in this career.
+        self._training_failures: list[tuple[int, int]] = []
 
     @property
     def turn(self) -> int:
         return self._turn
+
+    @property
+    def training_failures(self) -> tuple[tuple[int, int], ...]:
+        """Failed trainings as (0-based turn, action) in chronological order."""
+        return tuple(self._training_failures)
 
     @property
     def stats(self) -> tuple[int, int, int, int, int, int]:
@@ -269,6 +276,9 @@ class UmaState(pyspiel.State):
         return tuple(deltas)
 
     def _apply_training_result(self, action: int, success: bool) -> None:
+        if not success:
+            self._training_failures.append((self._turn, action))
+
         if success or action == WIT_ACTION:
             # Energy recovery is read before friendships move this turn.
             self._energy = clip_energy(self._energy + self._energy_delta(action))
