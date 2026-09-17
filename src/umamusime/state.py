@@ -410,12 +410,15 @@ class UmaState(pyspiel.State):
         lines = []
         lines.append(f"{calendar_label(self._display_turn())}")
         lines.append(f"Energy: {self._energy}")
-        training_cols = [
-            [f"Lv. {self.facility_level(action)}", stat, self._training_gains(action)]
-            for action, stat in enumerate(self.stats[:5], start=1)
-        ]
-        for action, col in enumerate(training_cols, start=1):
-            col.extend(self._support_lines_for(action))
+        show_next_training = not self.is_terminal()
+        training_cols = []
+        for action, stat in enumerate(self.stats[:5], start=1):
+            col = [f"Lv. {self.facility_level(action)}", stat]
+            if show_next_training:
+                col.append(self._training_gains(action))
+                col.append(f"{self._failure_probability(action) * 100:.0f}% fail")
+                col.extend(self._support_lines_for(action))
+            training_cols.append(col)
         lines.append(
             tabulate(
                 {
