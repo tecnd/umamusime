@@ -5,7 +5,7 @@ description: Run Random, truncated MCTS, and DQN on Umamusime, print each method
 
 # Benchmark Random, MCTS, and DQN
 
-Compare OpenSpiel's uniform random bot, truncated MCTS search, and DQN on Mihono Bourbon's 72-turn (3-year) Umamusime career. Year 3 Late April is the Tenno Sho (Spring): under 400 speed or 400 stamina ends the run as a soft fail.
+Compare OpenSpiel's uniform random bot, truncated MCTS search, and DQN on Mihono Bourbon's 72-turn (3-year) Umamusime career. Year 3 Late April is the Tenno Sho (Spring): under 400 speed or 400 stamina ends the run as a soft fail. Training can also fail mid-career when energy after cost is low; those fails cost the turn and (for speed/stamina/power/guts) −10 to the trained stat.
 
 ## Instructions
 
@@ -22,10 +22,11 @@ uv run python -m umamusime.compare
    - Final state of the **best** (highest-reward) run
    - Reward of that best run
    - Whether that best run **finished normally** or ended in a **Tenno Sho (Spring) soft fail**
+   - How many times training **failed** in that best run, and **when** (calendar label + action) each fail happened
    - Actions of that best run, in order, named with `state.action_to_string`
 
-3. For each method, write **one sentence** summarizing the chosen rest/training strategy from that **best** run's action sequence. Do not count actions programmatically or reuse a canned template. Do not summarize the discarded runs.
+3. For each method, write **one sentence** summarizing the chosen rest/training strategy from that **best** run's action sequence **and** its training-fail record. Do not count actions programmatically or reuse a canned template. Do not summarize the discarded runs. When fails matter (many fails, clusters at low energy, or almost none despite aggressive training), mention them; when the run never failed, you can say so briefly or omit if irrelevant.
 
-4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, whether it finished normally or soft-failed the Tenno Sho (Spring), and your one-sentence summary. Do not re-run the play loops.
+4. Show the user the MCTS one-run time, the DQN training time, each method's run rewards, the best run's final state and reward, whether it finished normally or soft-failed the Tenno Sho (Spring), the training-fail count and timings, and your one-sentence summary. Do not re-run the play loops.
 
 Do not reimplement the bots. `umamusime.compare` calls `umamusime.bots.random_bot.play` (OpenSpiel `UniformRandomBot`), `umamusime.bots.mcts_truncated.play`, `umamusime.bots.dqn.train`, and `umamusime.bots.dqn.play`. The original full-rollout bot stays at `umamusime.bots.mcts.play` and is not part of this benchmark.
