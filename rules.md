@@ -1,12 +1,42 @@
 # Umamusime
 
-Single-player career, 72 turns over 3 years. Each turn is half a month: turn 0 is Year 1, Early January and turn 71 is Year 3, Late December.
+Single-player career, 78 turns: 72 half-months over 3 years, then 6 URA Finale turns. Turn 0 is Year 1, Early January; turn 71 is Year 3, Late December; turns 72–77 are Finale 1–6.
 
-You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `initial_speed`, `initial_stamina`, `initial_power`, `initial_guts`, and `initial_wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 107 stamina, 92 power, 102 guts, 143 wit. Those starting stats count toward score.
+You start at 100 energy. Speed, stamina, power, guts, and wit start at the OpenSpiel `initial_speed`, `initial_stamina`, `initial_power`, `initial_guts`, and `initial_wit` params (defaults 96, 72, 92, 102, 88), plus whatever the support deck grants as **initial {stat}**. Skill points always start at 0 (they are not a game param). The default deck therefore begins at 116 speed, 127 stamina, 92 power, 102 guts, 123 wit before turn-0 events. Those starting stats count toward score.
 
-In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules.
+In years 2 and 3, Early July through Late August (inclusive) are summer camp turns: every training facility is treated as level 5 for that turn, then returns to its real level. Successful camp trainings still count as facility uses. Support cards have no extra camp rules. Finale turns are never summer camp.
 
-Year 3 Late April (turn 55) is the **Tenno Sho (Spring)**, not a training turn. If speed or stamina is below 400 when that turn arrives, the run is a **soft fail** and ends immediately. Passing the check skips training for that half-month and the career continues at Year 3 Early May.
+### Career races
+
+Scheduled career races replace the training turn. When the calendar reaches a race turn, the run checks speed and stamina against that race's minimums (after any pre-turn events for that half-month). Failing either check is a **soft fail** and ends the career immediately. Passing skips training for that turn and continues at the next half-month (or Finale turn).
+
+The race list is the OpenSpiel `races` param: comma-separated `turn:name:min_speed:min_stamina` entries. Defaults:
+
+| Turn | Label | Race | Speed | Stamina |
+| --- | --- | --- | --- | --- |
+| 11 | Year 1, Late June | Debut | 111 | 74 |
+| 22 | Year 1, Early December | Asahi Hai | 179 | 154 |
+| 29 | Year 2, Late March | Spring Stakes | 220 | 294 |
+| 30 | Year 2, Early April | Satsuki Sho | 224 | 365 |
+| 33 | Year 2, Late May | Japanese Derby | 299 | 314 |
+| 43 | Year 2, Late October | Kikuka Sho | 285 | 556 |
+| 55 | Year 3, Late April | Tenno Sho (Spring) | 367 | 815 |
+| 69 | Year 3, Late November | Japan Cup | 503 | 556 |
+| 71 | Year 3, Late December | Arima Kinen | 523 | 724 |
+| 73 | Finale 2 | URA Finale Qualifier | 522 | 519 |
+| 75 | Finale 4 | URA Finale Semifinal | 539 | 614 |
+| 77 | Finale 6 | URA Finale Finals | 580 | 670 |
+
+Finale 1, 3, and 5 are normal training turns.
+
+### Events
+
+A few fixed pre-turn events fire at the start of the labeled turn (before placement or a race check). They do not replace the turn.
+
+- **Inspiration** (Year 1 Early January, Year 2 Early April, Year 3 Early April): flat `inspiration_speed` and `inspiration_stamina` (OpenSpiel params, defaults **50** / **50**). No UmaGrowth. Stat gains score like other stat changes.
+- **Energy**: Year 2 Early January +20; Year 2 Early August +30; Year 3 Early January +30; Year 3 Late January +20; Year 3 Early August +30. Energy is clipped to `[0, 100]` and is not scored.
+
+With default Inspiration on turn 0, the default deck opens training at 166 speed and 177 stamina.
 
 Each of speed, stamina, power, guts, and wit is clipped to `[0, 1200]`. Energy is clipped to `[0, 100]`. Skill points are not capped. There is no dedicated skill-point training.
 
@@ -22,7 +52,7 @@ Score is the sum of per-turn rewards plus the lookup of the starting stats (Open
 
 A failed training scores the lookup drop on the clipped −10 (failed speed at 0 speed scores 0).
 
-`min_utility` is 0 (every training stat failed down to 0). `max_utility` is filling every capped stat, plus the 1.3 × rainbow skill-point ceiling (`5 × 3841 + 1.3 × 42 × 72 = 23136.2` on the default deck).
+`min_utility` is 0 (every training stat failed down to 0). `max_utility` is filling every capped stat, plus the 1.3 × rainbow skill-point ceiling (`5 × 3841 + 1.3 × 35 × 78 = 22754.0` on the default deck).
 
 ## Turn structure
 
@@ -57,7 +87,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the `initial_{stat}` OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`. Skill points always have 0 growth. Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the `initial_{stat}` OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`. Skill points always have 0 growth. Career races are the `races` param (see above). Inspiration flat buffs are `inspiration_speed` and `inspiration_stamina` (defaults 50). Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 
@@ -68,7 +98,7 @@ The deck is always exactly six cards, passed as the `cards` game parameter (comm
 | Sweep Tosho | speed | 30 | 40 | 10 | 25 | 50 | — | — | skill points 1 |
 | Fine Motion | wit | 37.5 | 30 | 15 | 15 | 35 | 5 | wit 35 | wit 1 |
 | Super Creek | stamina | 37.5 | — | 15 | 30 | 55 | — | stamina 35 | stamina 1 |
-| Agnes Tachyon | wit | 20 | 40 | 5 | 25 | 50 | 4 | wit 20 | wit 1, skill points 1 |
+| Manhattan Cafe | stamina | 20 | 40 | 5 | 25 | 70 | — | stamina 20 | stamina 1 |
 
 ### Placement
 
@@ -113,7 +143,7 @@ Worked example: level 5 speed with rainbow Kitasan Black, non-rainbow Tokai Teio
 
 ### Wit friendship recovery
 
-On wit training, each attending card that is already rainbowed adds its wit friendship recovery to the +5 energy. These stack additively (Fine Motion + Agnes Tachyon both rainbowed → +14 energy).
+On wit training, each attending card that is already rainbowed adds its wit friendship recovery to the +5 energy. These stack additively (Fine Motion rainbowed → +10 energy).
 
 ## Failure
 

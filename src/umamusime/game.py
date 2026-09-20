@@ -6,6 +6,13 @@ from .actions import NODES_PER_TURN, NUM_ACTIONS, NUM_CARDS, NUM_PLACEMENT_OUTCO
 from .calendar import MAX_TURNS
 from .cards import SupportCard, cards_from_param, deck_param
 from .observer import UmaObserver
+from .races import (
+    DEFAULT_EVENTS,
+    DEFAULT_INSPIRATION_SPEED,
+    DEFAULT_INSPIRATION_STAMINA,
+    races_from_param,
+    races_param,
+)
 from .scoring import MAX_STAT, SKILL_POINT_WEIGHT, stat_score
 from .state import UmaState
 from .training import (
@@ -22,6 +29,9 @@ from .training import (
 def _default_params() -> dict[str, str | int | float]:
     return {
         "cards": deck_param(),
+        "races": races_param(),
+        "inspiration_speed": DEFAULT_INSPIRATION_SPEED,
+        "inspiration_stamina": DEFAULT_INSPIRATION_STAMINA,
         **dict(zip(INITIAL_STAT_PARAMS, DEFAULT_INITIAL_STATS[:5], strict=True)),
         **dict(zip(GROWTH_PARAMS, UMA_GROWTH[:5], strict=True)),
     }
@@ -90,6 +100,12 @@ class UmaGame(pyspiel.Game):
             raise ValueError(
                 f"Expected a deck of {NUM_CARDS} support cards, got {len(cards)}"
             )
+        races = races_from_param(str(params["races"]))
+        for race in races:
+            if race.turn >= MAX_TURNS:
+                raise ValueError(
+                    f"Race {race.name!r} turn {race.turn} is outside 0..{MAX_TURNS - 1}"
+                )
         # Skill points always start at 0 and have 0 UmaGrowth.
         uma_growth = tuple(float(params[name]) for name in GROWTH_PARAMS) + (0.0,)
         game_type = (
@@ -97,6 +113,11 @@ class UmaGame(pyspiel.Game):
         )
         super().__init__(game_type, _game_info(cards), params)
         self.cards = cards
+        self.races = races
+        self.races_by_turn = {race.turn: race for race in races}
+        self.events_by_turn = {event.turn: event for event in DEFAULT_EVENTS}
+        self.inspiration_speed = int(params["inspiration_speed"])
+        self.inspiration_stamina = int(params["inspiration_stamina"])
         self.uma_growth = uma_growth
         self.placement_outcomes = tuple(placement_outcomes(card) for card in self.cards)
         base = tuple(int(params[name]) for name in INITIAL_STAT_PARAMS) + (0,)

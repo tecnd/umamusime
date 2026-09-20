@@ -17,7 +17,7 @@ def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
         game,
         uct_c=2,
         max_simulations=100,
-        evaluator=mcts.RandomRolloutEvaluator(n_rollouts=5, random_state=rng),
+        evaluator=mcts.RandomRolloutEvaluator(n_rollouts=15, random_state=rng),
         random_state=rng,
     )
     player_actions: list[int] = []
@@ -25,13 +25,14 @@ def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
         if state.is_chance_node():
             outcomes, probs = zip(*state.chance_outcomes())
             action = rng.choice(outcomes, p=probs)
+            action_label = None
         else:
             action = bot.step(state)
             player_actions.append(int(action))
-        if verbose:
-            print(state.action_to_string(state.current_player(), action))
+            action_label = state.action_to_string(state.current_player(), action)
         state.apply_action(action)
-        if verbose:
+        if verbose and action_label is not None:
+            print(action_label)
             print(state)
     if verbose:
         print(f"Returns: {state.returns()}")

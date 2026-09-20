@@ -31,11 +31,9 @@ from .actions import (
 from .calendar import (
     MAX_TURNS,
     SUMMER_CAMP_TURNS,
-    TENNO_SHO_MIN_SPEED,
-    TENNO_SHO_MIN_STAMINA,
-    TENNO_SHO_SPRING_TURN,
     calendar_label,
 )
+from .races import CareerRace
 from .scoring import MAX_STAT, MIN_STAT, SKILL_POINT_WEIGHT, stat_score
 from .training import (
     FAIL_STATS,
@@ -92,9 +90,13 @@ class UmaState(pyspiel.State):
         self._score = float(sum(stat_score(stat) for stat in game.initial_stats[:5]))
         self._last_reward = 0.0
         self._pending_action: int | None = None
-        self._soft_failed = False
+        self._failed_race: CareerRace | None = None
+        self._last_training_failed = False
         # (turn, action) for each failed training in this career.
         self._training_failures: list[tuple[int, int]] = []
+        self._start_current_turn()
+        # Turn-0 event score is part of the opening total, not a step reward.
+        self._last_reward = 0.0
 
     @property
     def turn(self) -> int:
@@ -276,6 +278,7 @@ class UmaState(pyspiel.State):
         return tuple(deltas)
 
     def _apply_training_result(self, action: int, success: bool) -> None:
+        self._last_training_failed = not success
         if not success:
             self._training_failures.append((self._turn, action))
 
@@ -300,36 +303,48 @@ class UmaState(pyspiel.State):
                 )
             self._card_states = tuple(card_states)
 
-        before = (
-            self._speed,
-            self._stamina,
-            self._power,
-            self._guts,
-            self._wit,
-        )
+        before = self.stats[:5]
         applied = self._apply_stats(gains)
-        after = (
-            self._speed,
-            self._stamina,
-            self._power,
-            self._guts,
-            self._wit,
-        )
-        self._last_reward = (
-            sum(stat_score(new) - stat_score(old) for new, old in zip(after, before))
-            + SKILL_POINT_WEIGHT * applied[5]
-        )
+        after = self.stats[:5]
+        self._last_reward = self._stat_score_delta(before, after, applied[5])
         self._score += self._last_reward
 
         self._turn += 1
         self._pending_action = None
-        self._begin_turn()
+        self._start_current_turn()
 
-    def _begin_turn(self) -> None:
-        if self._turn >= MAX_TURNS or self._soft_failed:
+    def _stat_score_delta(
+        self, before: Sequence[int], after: Sequence[int], skill_delta: int
+    ) -> float:
+        return (
+            sum(stat_score(new) - stat_score(old) for new, old in zip(after, before))
+            + SKILL_POINT_WEIGHT * skill_delta
+        )
+
+    def _apply_pre_turn_effects(self) -> None:
+        event = self.get_game().events_by_turn.get(self._turn)
+        if event is None:
             return
-        if self._turn == TENNO_SHO_SPRING_TURN:
-            self._resolve_tenno_sho_spring()
+        if event.energy:
+            self._energy = clip_energy(self._energy + event.energy)
+        if not event.inspiration:
+            return
+        game = self.get_game()
+        gains = (game.inspiration_speed, game.inspiration_stamina, 0, 0, 0, 0)
+        before = self.stats[:5]
+        applied = self._apply_stats(gains)
+        after = self.stats[:5]
+        reward = self._stat_score_delta(before, after, applied[5])
+        self._score += reward
+        self._last_reward += reward
+
+    def _start_current_turn(self) -> None:
+        if self._turn >= MAX_TURNS or self._failed_race is not None:
+            return
+        self._apply_pre_turn_effects()
+        race = self.get_game().races_by_turn.get(self._turn)
+        if race is not None:
+            self._resolve_race(race)
             return
         self._card_states = tuple(
             CardState(card_state.friendship, PLACEMENT_AWAY)
@@ -338,13 +353,12 @@ class UmaState(pyspiel.State):
         self._placement_index = 0
         self._phase = Phase.PLACEMENT
 
-    def _resolve_tenno_sho_spring(self) -> None:
-        # Year 3 Late April is the race, not a training turn.
+    def _resolve_race(self, race: CareerRace) -> None:
         self._turn += 1
-        if self._speed < TENNO_SHO_MIN_SPEED or self._stamina < TENNO_SHO_MIN_STAMINA:
-            self._soft_failed = True
+        if self._speed < race.min_speed or self._stamina < race.min_stamina:
+            self._failed_race = race
             return
-        self._begin_turn()
+        self._start_current_turn()
 
     def apply_action(self, action):
         if self._phase == Phase.PLACEMENT:
@@ -377,10 +391,13 @@ class UmaState(pyspiel.State):
         self._apply_training_result(action, success=(p_fail == 0.0))
 
     def is_terminal(self):
-        return self._turn >= MAX_TURNS or self._soft_failed
+        return self._turn >= MAX_TURNS or self._failed_race is not None
 
-    def ended_by_tenno_sho_fail(self) -> bool:
-        return self._soft_failed
+    def ended_by_race_fail(self) -> bool:
+        return self._failed_race is not None
+
+    def failed_race(self) -> CareerRace | None:
+        return self._failed_race
 
     def _display_turn(self) -> int:
         """0-based turn shown in labels; terminal states show the last consumed turn."""
@@ -416,10 +433,53 @@ class UmaState(pyspiel.State):
             lines.append(f"{prefix}{label}")
         return lines
 
+    def _next_race(self) -> CareerRace | None:
+        """Soonest scheduled race on or after the displayed turn."""
+        turn = self._display_turn()
+        for race in self.get_game().races:
+            if race.turn >= turn:
+                return race
+        return None
+
+    def _event_message(self) -> str | None:
+        event = self.get_game().events_by_turn.get(self._display_turn())
+        if event is None:
+            return None
+        parts: list[str] = []
+        if event.energy:
+            parts.append(f"+{event.energy} energy")
+        if event.inspiration:
+            game = self.get_game()
+            parts.append(
+                "Inspiration "
+                f"(+{game.inspiration_speed} speed, "
+                f"+{game.inspiration_stamina} stamina)"
+            )
+        return f"Event: {'; '.join(parts)}" if parts else None
+
     def __str__(self):
         lines = []
+        if self._last_training_failed:
+            lines.append("Failed!")
         lines.append(f"{calendar_label(self._display_turn())}")
+        event_message = self._event_message()
+        if event_message is not None:
+            lines.append(event_message)
         lines.append(f"Energy: {self._energy}")
+        if not self.is_terminal():
+            race = self._next_race()
+            if race is not None:
+                turns_until = race.turn - self._display_turn()
+                if turns_until == 0:
+                    when = "now"
+                elif turns_until == 1:
+                    when = "in 1 turn"
+                else:
+                    when = f"in {turns_until} turns"
+                lines.append(
+                    f"Next race: {race.name} {when} "
+                    f"(need {race.min_speed} speed, {race.min_stamina} stamina)"
+                )
         show_next_training = not self.is_terminal()
         training_cols = []
         for action, stat in enumerate(self.stats[:5], start=1):
@@ -443,10 +503,10 @@ class UmaState(pyspiel.State):
             )
         )
         lines.append(f"Skill points: {self._skill_points}")
-        if self._soft_failed:
+        if self._failed_race is not None:
+            race = self._failed_race
             lines.append(
-                "Ended: Tenno Sho (Spring) soft fail "
-                f"(need {TENNO_SHO_MIN_SPEED} speed and "
-                f"{TENNO_SHO_MIN_STAMINA} stamina)"
+                f"Ended: {race.name} soft fail "
+                f"(need {race.min_speed} speed and {race.min_stamina} stamina)"
             )
         return "\n".join(lines)
