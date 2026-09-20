@@ -1,5 +1,7 @@
-# 3 years × 12 months × 2 half-months.
-MAX_TURNS = 72
+# 3 years × 12 months × 2 half-months, then 6 URA Finale turns.
+_CALENDAR_TURNS = 72
+_FINALE_TURNS = 6
+MAX_TURNS = _CALENDAR_TURNS + _FINALE_TURNS
 _TURNS_PER_YEAR = 24
 _MONTHS = (
     "January",
@@ -17,10 +19,6 @@ _MONTHS = (
 )
 _SUMMER_CAMP_YEARS = frozenset({2, 3})
 _SUMMER_CAMP_MONTHS = frozenset({"July", "August"})
-# Year 3 Late April: Tenno Sho (Spring). Not a training turn.
-TENNO_SHO_SPRING_TURN = 55
-TENNO_SHO_MIN_SPEED = 400
-TENNO_SHO_MIN_STAMINA = 400
 
 
 def _calendar_parts(turn: int) -> tuple[int, str, str]:
@@ -31,19 +29,26 @@ def _calendar_parts(turn: int) -> tuple[int, str, str]:
 
 
 def calendar_label(turn: int) -> str:
-    """Calendar date for a 0-based turn in 0..71.
+    """Calendar date for a 0-based turn in 0..77.
 
-    Turn 0 is Year 1, Early January; turn 71 is Year 3, Late December.
+    Turn 0 is Year 1, Early January; turn 71 is Year 3, Late December;
+    turns 72–77 are Finale 1–6.
     """
+    if turn >= _CALENDAR_TURNS:
+        return f"Finale {turn - _CALENDAR_TURNS + 1}"
     year, month, half = _calendar_parts(turn)
     return f"Year {year}, {half} {month}"
 
 
-assert calendar_label(TENNO_SHO_SPRING_TURN) == "Year 3, Late April"
+assert calendar_label(55) == "Year 3, Late April"
+assert calendar_label(72) == "Finale 1"
+assert calendar_label(77) == "Finale 6"
 
 
 def _is_summer_camp_turn(turn: int) -> bool:
-    # Years 2–3, Early July through Late August inclusive.
+    # Years 2–3, Early July through Late August inclusive. Finale turns never camp.
+    if turn >= _CALENDAR_TURNS:
+        return False
     year, month, _half = _calendar_parts(turn)
     return year in _SUMMER_CAMP_YEARS and month in _SUMMER_CAMP_MONTHS
 

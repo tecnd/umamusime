@@ -94,17 +94,16 @@ SUPER_CREEK = SupportCard(
     stat_bonus={"stamina": 1},
 )
 
-AGNES_TACHYON = SupportCard(
-    name="Agnes Tachyon",
-    main_stat="wit",
+MANHATTAN_CAFE = SupportCard(
+    name="Manhattan Cafe",
+    main_stat="stamina",
     friendship_bonus=20,
     mood_effect=40,
     training_effectiveness=5,
     initial_friendship=25,
-    specialty_priority=50,
-    wit_friendship_recovery=4,
-    initial_stats={"wit": 20},
-    stat_bonus={"wit": 1, "skill_points": 1},
+    specialty_priority=70,
+    initial_stats={"stamina": 20},
+    stat_bonus={"stamina": 1},
 )
 
 DEFAULT_DECK = (
@@ -113,7 +112,7 @@ DEFAULT_DECK = (
     SWEEP_TOSHO,
     FINE_MOTION,
     SUPER_CREEK,
-    AGNES_TACHYON,
+    MANHATTAN_CAFE,
 )
 
 CARD_BY_NAME = {card.name: card for card in DEFAULT_DECK}

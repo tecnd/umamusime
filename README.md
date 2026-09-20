@@ -7,14 +7,15 @@ Umamusime is a simplified implementation of Umamusume in OpenSpiel/pyspiel to co
 * Support cards
 * Training calculations
 * Scoring
+* Career races (configurable schedule; soft-fail on speed/stamina gates)
+* Partial events (Inspiration stat buffs and fixed energy gifts before the labeled turn)
 
 ## What's not implemented
 
-* Races
-* Events
 * Skills and skill hints
 * Inheritance
+* Full event / scenario scripting beyond the fixed Inspiration and energy gifts
 
 ## Known issues
 
-* No races means careers can complete with impossible stat lines
+* Race turns skip training with no race rewards; only the soft-fail gate is modelled
