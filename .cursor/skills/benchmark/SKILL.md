@@ -16,7 +16,7 @@ uv run python -m umamusime.compare
 ```
 
 2. The command **always retrains DQN from scratch** (it does not reuse `dqn_checkpoint.pt`), plays **3** games for each of Random, truncated MCTS, and greedy DQN, and prints:
-   - How long **one** MCTS run took
+   - How long **one** MCTS run took. The shipped search uses full-career rollouts, `uct_c=200`, 100 simulations, and 15 rollouts, about 40 seconds per game.
    - How long DQN **training** took
    - The reward of every run, and which run was best
    - Final state of the **best** (highest-reward) run

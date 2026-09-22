@@ -30,10 +30,10 @@ RECORD_TURNS = (29, 43)
 @dataclass(frozen=True)
 class Arm:
     name: str
-    uct_c: float = 2.0
+    uct_c: float = 200.0
     max_simulations: int = 100
     n_rollouts: int = 15
-    rollout_turns: int | None = 6
+    rollout_turns: int | None = None
     solve: bool = True
     dont_return_chance_node: bool = False
     use_puct: bool = False
@@ -252,10 +252,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("run", "summarize"))
     parser.add_argument("--name", default="arm")
-    parser.add_argument("--uct-c", type=float, default=2.0)
+    parser.add_argument("--uct-c", type=float, default=200.0)
     parser.add_argument("--sims", type=int, default=100)
     parser.add_argument("--rollouts", type=int, default=15)
-    parser.add_argument("--horizon", default="6")
+    parser.add_argument("--horizon", default="full")
     parser.add_argument("--seeds", default="1000:1001")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--decision-limit", type=int, default=None)

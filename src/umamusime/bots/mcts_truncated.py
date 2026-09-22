@@ -9,12 +9,17 @@ from ..actions import NODES_PER_TURN
 from ..game import UmaGame
 from ..state import UmaState
 
-# Rollouts are almost all of search time. `returns()` is the absolute career
-# score, so a rollout's length decides how much of the remaining career
-# (including race soft-fails) is visible when comparing actions.
-ROLLOUT_TURNS = 6
-ROLLOUT_LENGTH = ROLLOUT_TURNS * NODES_PER_TURN
-DEFAULT_UCT_C = 2.0
+# Rollouts return the absolute career score, so their length is how much of
+# the remaining career, including race soft-fails, search can see. A 6-turn
+# cutoff never reaches the next stamina gate. Full-career rollouts do: on 96
+# paired seeds they scored +1981 ± 358 against that cutoff at the old
+# uct_c=2, finished 12 careers instead of 1, and survived +19 turns.
+# uct_c=200 beat uct_c=2 by +1238 ± 452 on the same full-horizon seeds;
+# uct_c=400 did not beat 200. 100 simulations and 15 rollouts take about
+# 42s per game. A cutoff of 48 turns is identical to no cutoff, because a
+# random rollout ends at a race before then.
+ROLLOUT_TURNS = None
+DEFAULT_UCT_C = 200.0
 DEFAULT_MAX_SIMULATIONS = 100
 DEFAULT_N_ROLLOUTS = 15
 # Career chance nodes and the search consume different streams. Paired sweeps
