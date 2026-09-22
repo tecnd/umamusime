@@ -16,8 +16,9 @@ from ..state import UmaState
 # uct_c=2, finished 12 careers instead of 1, and survived +19 turns.
 # uct_c=200 beat uct_c=2 by +1238 ± 452 on the same full-horizon seeds;
 # uct_c=400 did not beat 200. 100 simulations and 15 rollouts take about
-# 42s per game. A cutoff of 48 turns is identical to no cutoff, because a
-# random rollout ends at a race before then.
+# 42s per game, and the longest of those 96 was 62s. A cutoff of 48 turns
+# is identical to no cutoff, because a random rollout ends at a race
+# before then.
 ROLLOUT_TURNS = None
 DEFAULT_UCT_C = 200.0
 DEFAULT_MAX_SIMULATIONS = 100
