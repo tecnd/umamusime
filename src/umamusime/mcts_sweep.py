@@ -1,7 +1,7 @@
-"""Parameter sweeps for truncated MCTS. Does not change the search algorithm.
+"""Parameter sweeps for MCTS. Does not change the search algorithm.
 
 Writes one JSON object per game. Seeds are the environment seed passed to
-`mcts_truncated.play`; reruns skip seeds already recorded for that arm.
+`mcts.play`; reruns skip seeds already recorded for that arm.
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from typing import Any
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-from open_spiel.python.algorithms import mcts
+from open_spiel.python.algorithms import mcts as openspiel_mcts
 
-from .bots.mcts_truncated import PlayTrace, play
+from .bots.mcts import PlayTrace, play
 
 RECORD_TURNS = (29, 43)
 
@@ -53,7 +53,9 @@ def play_record(
         rollout_turns=arm.rollout_turns,
         solve=arm.solve,
         dont_return_chance_node=arm.dont_return_chance_node,
-        child_selection_fn=mcts.SearchNode.puct_value if arm.use_puct else None,
+        child_selection_fn=openspiel_mcts.SearchNode.puct_value
+        if arm.use_puct
+        else None,
         record_turns=RECORD_TURNS,
         decision_limit=decision_limit,
         trace=trace,

@@ -13,13 +13,13 @@ uv run ty check
 uv run python -c "from umamusime.game import UmaGame; print(UmaGame().new_initial_state())"
 ```
 
-There is currently no automated test suite. Run Ruff, ty, and a focused smoke command for changed behavior. `uv run python -m umamusime.compare` is the full Random/truncated-MCTS/DQN benchmark; it is slow, always retrains DQN, and overwrites the ignored `dqn_checkpoint.pt`.
+There is currently no automated test suite. Run Ruff, ty, and a focused smoke command for changed behavior. `uv run python -m umamusime.compare` is the full Random/MCTS/DQN benchmark; it is slow, always retrains DQN, and overwrites the ignored `dqn_checkpoint.pt`.
 
 Useful entry points:
 
 - `uv run umamusime` — interactive human game.
 - `uv run python -m umamusime.bots.random_bot` — random baseline.
-- `uv run python -m umamusime.bots.mcts_truncated` — benchmark MCTS.
+- `uv run python -m umamusime.bots.mcts` — benchmark MCTS.
 - `uv run python -m umamusime.bots.dqn` — load or create a DQN checkpoint.
 
 ## Code map
@@ -29,7 +29,7 @@ Useful entry points:
 - `src/umamusime/training.py`, `cards.py`, `scoring.py`, and `calendar.py` hold game data and pure calculations.
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation.
-- `src/umamusime/bots/` contains human, random, full/truncated MCTS, and DQN players; `compare.py` benchmarks selected bots.
+- `src/umamusime/bots/` contains human, random, MCTS, and DQN players; `compare.py` benchmarks selected bots.
 - `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
 ## Conventions and pitfalls
