@@ -126,18 +126,6 @@ class UmaState(pyspiel.State):
     def card_states(self) -> tuple[CardState, ...]:
         return self._card_states
 
-    def chance_stream_key(self) -> tuple[int, int, int]:
-        """(turn, channel, index) identifying this chance node for seeding.
-
-        Channel 0 is a support placement (index = card slot). Channel 1 is the
-        training fail/success roll (index unused).
-        """
-        if self._phase == Phase.PLACEMENT:
-            return (self._turn, 0, self._placement_index)
-        if self._phase == Phase.RESULT:
-            return (self._turn, 1, 0)
-        raise ValueError(f"No chance stream in phase {self._phase}")
-
     def current_player(self):
         if self.is_terminal():
             return pyspiel.PlayerId.TERMINAL

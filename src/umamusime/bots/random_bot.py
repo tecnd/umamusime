@@ -1,18 +1,23 @@
+import numpy as np
 from open_spiel.python.bots.uniform_random import UniformRandomBot
 
-from ..chance import bot_rng, sample_chance
 from ..game import UmaGame
 from ..state import UmaState
+
+# Bot decisions use a different stream than career chance nodes.
+_BOT_SEED_OFFSET = 1_000_003
 
 
 def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
     game = UmaGame()
     state: UmaState = game.new_initial_state()
-    bot = UniformRandomBot(0, bot_rng(seed))
+    env_rng = np.random.RandomState(seed)
+    bot = UniformRandomBot(0, np.random.RandomState(seed + _BOT_SEED_OFFSET))
     player_actions: list[int] = []
     while not state.is_terminal():
         if state.is_chance_node():
-            action = sample_chance(state, seed)
+            outcomes, probs = zip(*state.chance_outcomes())
+            action = env_rng.choice(outcomes, p=probs)
         else:
             action = bot.step(state)
             player_actions.append(int(action))
