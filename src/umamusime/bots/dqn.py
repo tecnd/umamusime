@@ -6,6 +6,7 @@ from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import dqn
 
 from ..calendar import MAX_TURNS
+from ..chance import SeededChanceSampler
 from ..game import UmaGame
 from ..state import UmaState
 
@@ -32,8 +33,11 @@ def _save(agent: dqn.DQN, path: pathlib.Path) -> None:
     )
 
 
-def _make_env_and_agent() -> tuple[rl_environment.Environment, dqn.DQN]:
-    env = rl_environment.Environment(UmaGame())
+def _make_env_and_agent(
+    *, chance_seed: int | None = None
+) -> tuple[rl_environment.Environment, dqn.DQN]:
+    sampler = SeededChanceSampler(chance_seed)
+    env = rl_environment.Environment(UmaGame(), chance_event_sampler=sampler)
     agent = dqn.DQN(
         player_id=0,
         state_representation_size=env.observation_spec()["info_state"][0],
@@ -74,6 +78,7 @@ def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> Non
 
 def train(*, verbose: bool = True, checkpoint: pathlib.Path = _CHECKPOINT) -> float:
     """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
+    # Training uses the sampler's default seed; evaluation reseeds per play().
     env, agent = _make_env_and_agent()
     started = time.perf_counter()
     _train(env, agent, log=verbose)
@@ -91,7 +96,7 @@ def play(
     seed: int | None = None,
     retrain: bool = False,
 ) -> tuple[UmaState, list[int]]:
-    env, agent = _make_env_and_agent()
+    env, agent = _make_env_and_agent(chance_seed=seed)
     if retrain or not checkpoint.exists():
         _train(env, agent, log=verbose)
         _save(agent, checkpoint)

@@ -1,7 +1,7 @@
-import numpy as np
 import pyspiel
 from open_spiel.python.algorithms import mcts as openspiel_mcts
 
+from ..chance import bot_rng, sample_chance
 from ..game import UmaGame
 from ..state import UmaState
 
@@ -12,9 +12,6 @@ from ..state import UmaState
 UCT_C = 200.0
 MAX_SIMULATIONS = 100
 N_ROLLOUTS = 15
-# Career chance nodes and the search consume different streams so a fixed
-# seed does not reshuffle environment luck when search internals change.
-BOT_SEED_OFFSET = 1_000_003
 
 
 class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
@@ -52,20 +49,18 @@ def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
     # API MCTS needs; per-turn rewards stay on the default game for DQN.
     game = UmaGame(reward_model=pyspiel.GameType.RewardModel.TERMINAL)
     state: UmaState = game.new_initial_state()
-    env_rng = np.random.RandomState(seed)
-    bot_rng = np.random.RandomState(seed + BOT_SEED_OFFSET)
+    search_rng = bot_rng(seed)
     bot = openspiel_mcts.MCTSBot(
         game,
         uct_c=UCT_C,
         max_simulations=MAX_SIMULATIONS,
-        evaluator=FastRolloutEvaluator(n_rollouts=N_ROLLOUTS, random_state=bot_rng),
-        random_state=bot_rng,
+        evaluator=FastRolloutEvaluator(n_rollouts=N_ROLLOUTS, random_state=search_rng),
+        random_state=search_rng,
     )
     player_actions: list[int] = []
     while not state.is_terminal():
         if state.is_chance_node():
-            outcomes, probs = zip(*state.chance_outcomes())
-            action = env_rng.choice(outcomes, p=probs)
+            action = sample_chance(state, seed)
             action_label = None
         else:
             action = bot.step(state)
