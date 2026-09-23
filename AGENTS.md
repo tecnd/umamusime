@@ -2,7 +2,7 @@
 
 ## Project
 
-Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. The project uses `uv` for Python, dependency, environment, and command management. `rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes.
+Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. The project uses `uv` for Python, dependency, environment, and command management. `docs/rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes. `docs/mcts-tuning.md` records how the shipped MCTS parameters were chosen.
 
 ## Setup and checks
 
@@ -30,6 +30,7 @@ Useful entry points:
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation.
 - `src/umamusime/bots/` contains human, random, MCTS, and DQN players; `compare.py` benchmarks selected bots.
+- `docs/rules.md` is the gameplay specification; `docs/mcts-tuning.md` explains the shipped MCTS parameters.
 - `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
 ## Conventions and pitfalls
@@ -38,7 +39,7 @@ Useful entry points:
 - Keep stat/action tuple indices aligned through the constants in `actions.py`; skill points are the sixth stat but have no facility or growth parameter.
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
 - Seed NumPy/OpenSpiel paths when reproducibility matters. Do not commit generated `*.pt`, virtual environments, or build artifacts.
-- Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `rules.md` when rules, defaults, scoring, or known limitations change.
+- Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `docs/rules.md` when rules, defaults, scoring, or known limitations change.
 - Use `uv run ruff format src` to format the codebase.
 
 ## Cursor Cloud specific instructions
