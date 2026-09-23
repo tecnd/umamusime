@@ -33,7 +33,6 @@ class Arm:
     uct_c: float = 200.0
     max_simulations: int = 100
     n_rollouts: int = 15
-    rollout_turns: int | None = None
     solve: bool = True
     dont_return_chance_node: bool = False
     use_puct: bool = False
@@ -50,7 +49,6 @@ def play_record(
         uct_c=arm.uct_c,
         max_simulations=arm.max_simulations,
         n_rollouts=arm.n_rollouts,
-        rollout_turns=arm.rollout_turns,
         solve=arm.solve,
         dont_return_chance_node=arm.dont_return_chance_node,
         child_selection_fn=openspiel_mcts.SearchNode.puct_value
@@ -68,7 +66,6 @@ def play_record(
         "uct_c": arm.uct_c,
         "max_simulations": arm.max_simulations,
         "n_rollouts": arm.n_rollouts,
-        "rollout_turns": "full" if arm.rollout_turns is None else arm.rollout_turns,
         "solve": arm.solve,
         "dont_return_chance_node": arm.dont_return_chance_node,
         "use_puct": arm.use_puct,
@@ -118,7 +115,7 @@ def run_arm(
     print(
         f"{arm.name}: {len(pending)} games, {jobs} workers, "
         f"sims={arm.max_simulations} rollouts={arm.n_rollouts} "
-        f"horizon={arm.rollout_turns} uct={arm.uct_c}",
+        f"uct={arm.uct_c}",
         flush=True,
     )
     fresh: list[dict[str, Any]] = []
@@ -231,19 +228,12 @@ def _parse_seeds(text: str) -> range:
     return range(int(start), int(stop))
 
 
-def _horizon(text: str) -> int | None:
-    if text == "full":
-        return None
-    return int(text)
-
-
 def _arm_from_args(args: argparse.Namespace) -> Arm:
     return Arm(
         name=args.name,
         uct_c=args.uct_c,
         max_simulations=args.sims,
         n_rollouts=args.rollouts,
-        rollout_turns=_horizon(args.horizon),
         solve=not args.no_solve,
         dont_return_chance_node=args.dont_return_chance_node,
         use_puct=args.puct,
@@ -257,7 +247,6 @@ def main() -> None:
     parser.add_argument("--uct-c", type=float, default=200.0)
     parser.add_argument("--sims", type=int, default=100)
     parser.add_argument("--rollouts", type=int, default=15)
-    parser.add_argument("--horizon", default="full")
     parser.add_argument("--seeds", default="1000:1001")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--decision-limit", type=int, default=None)

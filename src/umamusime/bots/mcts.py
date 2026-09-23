@@ -5,18 +5,13 @@ import numpy as np
 import pyspiel
 from open_spiel.python.algorithms import mcts as openspiel_mcts
 
-from ..actions import NODES_PER_TURN
 from ..game import UmaGame
 from ..state import UmaState
 
-# Rollouts return the absolute career score, so their length is how much of
-# the remaining career, including race soft-fails, search can see. Full-career
-# rollouts beat a 6-turn cutoff by +1981 ± 358 on 96 paired seeds (12 finished
-# careers versus 1, +19 turns). uct_c=200 beat uct_c=2 by +1238 ± 452 on the
-# same full-horizon seeds; uct_c=400 did not beat 200. 100 simulations and 15
-# rollouts take about 42s per game (max 62s on those seeds). A 48-turn cutoff
-# matches no cutoff, because a random rollout ends at a race before then.
-ROLLOUT_TURNS = None
+# Full-career random rollouts, uct_c=200, 100 simulations, and 15 rollouts:
+# on 96 paired seeds that beat a 6-turn cutoff by +1981 ± 358 (12 finished
+# careers versus 1) and beat uct_c=2 by +1238 ± 452. About 42s per game
+# (max 62s on those seeds). uct_c=400 did not beat 200.
 DEFAULT_UCT_C = 200.0
 DEFAULT_MAX_SIMULATIONS = 100
 DEFAULT_N_ROLLOUTS = 15
@@ -36,7 +31,7 @@ class PlayTrace:
 
 
 class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
-    """Random rollouts, sampled without numpy's `choice(p=...)`.
+    """Random rollouts to a terminal state, without numpy's `choice(p=...)`.
 
     `choice` validates the distribution on every call, which costs ~5us per
     chance node against ~0.3us for a cumulative sum. With eight chance nodes a
@@ -48,7 +43,6 @@ class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
         total = 0.0
         for _ in range(self.n_rollouts):
             working_state = state.clone()
-            length = 0
             while not working_state.is_terminal():
                 if working_state.is_chance_node():
                     threshold = random_sample()
@@ -61,17 +55,8 @@ class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
                     legal_actions = working_state.legal_actions()
                     action = legal_actions[int(random_sample() * len(legal_actions))]
                 working_state.apply_action(action)
-                length += 1
-                if self.max_length is not None and length >= self.max_length:
-                    break
             total += working_state.returns()[0]
         return [total / self.n_rollouts]
-
-
-def _rollout_length(rollout_turns: int | None) -> int | None:
-    if rollout_turns is None:
-        return None
-    return rollout_turns * NODES_PER_TURN
 
 
 def _record_passed_turns(
@@ -94,7 +79,6 @@ def play(
     uct_c: float = DEFAULT_UCT_C,
     max_simulations: int = DEFAULT_MAX_SIMULATIONS,
     n_rollouts: int = DEFAULT_N_ROLLOUTS,
-    rollout_turns: int | None = ROLLOUT_TURNS,
     solve: bool = True,
     dont_return_chance_node: bool = False,
     child_selection_fn: ChildSelection | None = None,
@@ -104,9 +88,8 @@ def play(
 ) -> tuple[UmaState, list[int]]:
     """Play one career.
 
-    `rollout_turns=None` rolls out until the career ends. `decision_limit`
-    stops after that many player decisions so a sweep can time search without
-    finishing the career; scored games leave it unset.
+    `decision_limit` stops after that many player decisions so a sweep can
+    time search without finishing the career; scored games leave it unset.
     """
     # MCTSBot rejects non-TERMINAL reward_model, but that is only a metadata
     # check. This game already implements returns() and the rest of the State
@@ -122,11 +105,7 @@ def play(
         game,
         uct_c=uct_c,
         max_simulations=max_simulations,
-        evaluator=FastRolloutEvaluator(
-            n_rollouts=n_rollouts,
-            random_state=bot_rng,
-            max_length=_rollout_length(rollout_turns),
-        ),
+        evaluator=FastRolloutEvaluator(n_rollouts=n_rollouts, random_state=bot_rng),
         solve=solve,
         random_state=bot_rng,
         dont_return_chance_node=dont_return_chance_node,
