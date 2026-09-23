@@ -1,20 +1,20 @@
-import numpy as np
 from open_spiel.python.bots.uniform_random import UniformRandomBot
 
 from ..game import UmaGame
+from ..rng import split_rngs
 from ..state import UmaState
 
 
 def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
     game = UmaGame()
     state: UmaState = game.new_initial_state()
-    rng = np.random.RandomState(seed)
-    bot = UniformRandomBot(0, rng)
+    env_rng, bot_rng = split_rngs(seed)
+    bot = UniformRandomBot(0, bot_rng)
     player_actions: list[int] = []
     while not state.is_terminal():
         if state.is_chance_node():
             outcomes, probs = zip(*state.chance_outcomes())
-            action = rng.choice(outcomes, p=probs)
+            action = env_rng.choice(outcomes, p=probs)
         else:
             action = bot.step(state)
             player_actions.append(int(action))

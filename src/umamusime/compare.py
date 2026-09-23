@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 
-from .bots import dqn, mcts_truncated, random_bot
+from .bots import dqn, mcts, random_bot
 from .calendar import calendar_label
 from .game import UmaGame
 from .state import UmaState
@@ -74,7 +74,7 @@ def main() -> None:
 
     def play_mcts(index: int) -> tuple[UmaState, list[int]]:
         started = time.perf_counter()
-        result = mcts_truncated.play(verbose=False, seed=_SEED + index)
+        result = mcts.play(verbose=False, seed=_SEED + index)
         if index == 0:
             mcts_run_s.append(time.perf_counter() - started)
         return result
