@@ -38,8 +38,9 @@ Useful entry points:
 - Preserve OpenSpiel's explicit phases: six support-placement chance nodes, one player decision, then an optional fail/success chance node.
 - Keep stat/action tuple indices aligned through the constants in `actions.py`; skill points are the sixth stat but have no facility or growth parameter.
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
-- Seed NumPy/OpenSpiel paths when reproducibility matters. Keep career chance
-  RNG separate from bot/search RNG so decision randomness does not reshuffle
+- Seed NumPy/OpenSpiel paths when reproducibility matters. Split each play
+  seed with `SeedSequence.spawn(2)` into separate career and bot/search
+  `RandomState`s (`rng.split_rngs`) so decision randomness does not reshuffle
   placements or fail rolls. Do not commit generated `*.pt`, virtual
   environments, or build artifacts.
 - Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `docs/rules.md` when rules, defaults, scoring, or known limitations change.
