@@ -54,6 +54,19 @@ buffer setting while retaining the tested cadence from the plan. Future
 tuning should compare at least three training seeds because the 6000-episode
 configuration varied substantially by seed.
 
+## Project comparison
+
+The full `umamusime.compare` command completed with DQN training in 158.5
+seconds. On its three comparison seeds, the best observed rewards were:
+
+| Bot | Rewards | Best |
+| --- | --- | ---: |
+| Random | 954.2, 636.8, 1026.8 | 1026.8 |
+| MCTS | 5959.7, 4441.9, 2902.7 | 5959.7 |
+| DQN | 4242.9, 5922.3, 5518.3 | 5922.3 |
+
+The DQN best comparison run finished normally with no training failures.
+
 ## Evaluation and compatibility
 
 `dqn.py` now evaluates periodic checkpoints over 30 fixed seeds and reports
