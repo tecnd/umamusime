@@ -132,9 +132,13 @@ seeds with 73/180 finished, against 6491 and 140/180 without. Not adopted.
 
 ## Findings
 
-- **Episodes.** 8000 beat 6000 by about 340. Beyond that the cost grows
-  linearly (about 16 ms/episode once careers finish) and a 12 000-episode
-  probe on one seed matched 6000.
+- **Episodes.** 8000 beat 6000 by about 340 (round 1). Past 8000 the score
+  plateaus while cost grows linearly (about 16 ms/episode once careers
+  finish). With target sync 250, pooled over the six training seeds: 8000
+  scores 6491, 10 000 scores 6518 (+27, well inside noise), and 12 000
+  scores 6244 (per-seed means 6004–6596). Because epsilon decay is a fraction
+  of the run, longer runs also explore longer, so more episodes do not
+  simply mean more exploitation. 8000 is the cheapest point on the plateau.
 - **Network size.** Larger networks did not help; the target is close to
   linear in the derived features. `[64, 64]` stays; `[32, 32]` was within
   noise but finished fewer careers.
