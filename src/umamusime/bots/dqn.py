@@ -23,13 +23,13 @@ _LOG_EVAL_CAREERS = 10
 class DQNConfig:
     """Hyperparameters; see docs/dqn-tuning.md for how they were chosen."""
 
-    episodes: int = 6000
+    episodes: int = 8000
     hidden_layers: tuple[int, ...] = (64, 64)
     learning_rate: float = 0.01
     replay_buffer_capacity: int = 50_000
     batch_size: int = 128
     learn_every: int = 10
-    update_target_network_every: int = 1000
+    update_target_network_every: int = 250
     min_buffer_size_to_learn: int = 1000
     epsilon_end: float = 0.05
     # Fraction of training steps over which epsilon falls linearly to its
