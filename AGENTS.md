@@ -43,11 +43,11 @@ Useful entry points:
   `RandomState`s (`rng.split_rngs`) so decision randomness does not reshuffle
   placements or fail rolls. Do not commit generated `*.pt`, virtual
   environments, or build artifacts.
-- When generating random seeds for testing, draw 128-bit random ints with
-  Python's `secrets.randbits(128)`. Pass them through `rng.split_rngs`
-  (`SeedSequence` accepts any size); `np.random.RandomState`, `env.seed`, and
-  `DQNConfig.seed` only take values below 2**32, so do not hand them a raw
-  128-bit seed. Log the seed you used so a failure can be reproduced.
+- When generating random seeds for testing, draw 32-bit random ints with
+  Python's `secrets.randbits(32)`. This is the largest range that
+  `np.random.RandomState`, `env.seed`, and `DQNConfig.seed` all accept
+  (0 to 2**32 - 1), so the same seed works everywhere, including
+  `rng.split_rngs`. Log the seed you used so a failure can be reproduced.
 - Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `docs/rules.md` when rules, defaults, scoring, or known limitations change.
 - Use `uv run ruff format src` to format the codebase.
 
