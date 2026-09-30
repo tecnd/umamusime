@@ -2,7 +2,7 @@
 
 ## Project
 
-Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. The project uses `uv` for Python, dependency, environment, and command management. `docs/rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes. `docs/mcts-tuning.md` records how the shipped MCTS parameters were chosen.
+Umamusime is a Python 3.11/OpenSpiel implementation of a simplified, single-player Umamusume career. The project uses `uv` for Python, dependency, environment, and command management. `docs/rules.md` is the detailed gameplay specification; keep it synchronized with behavior changes. `docs/mcts-tuning.md` records how the shipped MCTS parameters were chosen, and `docs/dqn-tuning.md` does the same for the DQN observation and hyperparameters.
 
 ## Setup and checks
 
@@ -20,7 +20,7 @@ Useful entry points:
 - `uv run umamusime` — interactive human game.
 - `uv run python -m umamusime.bots.random_bot` — random baseline.
 - `uv run python -m umamusime.bots.mcts` — benchmark MCTS.
-- `uv run python -m umamusime.bots.dqn` — load or create a DQN checkpoint.
+- `uv run python -m umamusime.bots.dqn` — load or create a DQN checkpoint (about 2 minutes to train). Delete `dqn_checkpoint.pt` after changing the observation size or network shape, since `load` will not match the old weights.
 
 ## Code map
 
@@ -28,9 +28,9 @@ Useful entry points:
 - `src/umamusime/state.py` owns the turn-phase state machine, action application, rewards, and terminal conditions.
 - `src/umamusime/training.py`, `cards.py`, `scoring.py`, and `calendar.py` hold game data and pure calculations.
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
-- `src/umamusime/observer.py` builds the normalized RL observation.
+- `src/umamusime/observer.py` builds the normalized RL observation (115 floats, layout in `docs/dqn-tuning.md`).
 - `src/umamusime/bots/` contains human, random, MCTS, and DQN players; `compare.py` benchmarks selected bots.
-- `docs/rules.md` is the gameplay specification; `docs/mcts-tuning.md` explains the shipped MCTS parameters.
+- `docs/rules.md` is the gameplay specification; `docs/mcts-tuning.md` and `docs/dqn-tuning.md` explain the shipped MCTS and DQN parameters.
 - `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
 ## Conventions and pitfalls
@@ -43,6 +43,11 @@ Useful entry points:
   `RandomState`s (`rng.split_rngs`) so decision randomness does not reshuffle
   placements or fail rolls. Do not commit generated `*.pt`, virtual
   environments, or build artifacts.
+- When generating random seeds for testing, draw 32-bit random ints with
+  Python's `secrets.randbits(32)`. This is the largest range that
+  `np.random.RandomState`, `env.seed`, and `DQNConfig.seed` all accept
+  (0 to 2**32 - 1), so the same seed works everywhere, including
+  `rng.split_rngs`. Log the seed you used so a failure can be reproduced.
 - Prefer typed helpers, immutable tuples/frozen data, relative package imports, and constants for game values. Update `docs/rules.md` when rules, defaults, scoring, or known limitations change.
 - Use `uv run ruff format src` to format the codebase.
 

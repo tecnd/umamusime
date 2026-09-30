@@ -166,7 +166,7 @@ class UmaState(pyspiel.State):
             return MAX_FACILITY_LEVEL
         return self._permanent_facility_level_for(action)
 
-    def _attending(self, action: int) -> list[int]:
+    def attending(self, action: int) -> list[int]:
         """Indices of the support cards on a training facility this turn."""
         assert action in TRAINING_ACTIONS
         return [
@@ -175,7 +175,7 @@ class UmaState(pyspiel.State):
             if card_state.placement == action
         ]
 
-    def _is_rainbow(self, index: int) -> bool:
+    def is_rainbow(self, index: int) -> bool:
         return self._card_states[index].friendship >= RAINBOW_FRIENDSHIP
 
     def _wit_energy_recovery(self) -> int:
@@ -183,28 +183,28 @@ class UmaState(pyspiel.State):
         cards = self.get_game().cards
         return sum(
             cards[index].wit_friendship_recovery
-            for index in self._attending(WIT_ACTION)
-            if self._is_rainbow(index)
+            for index in self.attending(WIT_ACTION)
+            if self.is_rainbow(index)
         )
 
-    def _energy_delta(self, action: int) -> int:
+    def energy_delta(self, action: int) -> int:
         level = 1 if action == REST_ACTION else self.facility_level(action)
         delta = TRAINING_ENERGY[action][level - 1]
         if action == WIT_ACTION:
             delta += self._wit_energy_recovery()
         return delta
 
-    def _failure_probability(self, action: int) -> float:
-        energy_after = self._energy + self._energy_delta(action)
+    def failure_probability(self, action: int) -> float:
+        energy_after = self._energy + self.energy_delta(action)
         return train_failure_chance(action, energy_after)
 
-    def _training_gains(self, action: int) -> tuple[int, ...]:
+    def training_gains(self, action: int) -> tuple[int, ...]:
         """Stat gains of a successful training, including support card effects."""
         if action == REST_ACTION:
             return (0,) * NUM_STATS
         base = TRAINING_STATS[action][self.facility_level(action) - 1]
         cards = self.get_game().cards
-        attending = self._attending(action)
+        attending = self.attending(action)
 
         friendship_multiplier = 1.0
         mood_effect = 0.0
@@ -212,7 +212,7 @@ class UmaState(pyspiel.State):
         stat_bonus = [0] * NUM_STATS
         for index in attending:
             card = cards[index]
-            if TRAINING_FOR_STAT[card.main_stat] == action and self._is_rainbow(index):
+            if TRAINING_FOR_STAT[card.main_stat] == action and self.is_rainbow(index):
                 friendship_multiplier *= 1.0 + card.friendship_bonus / 100.0
             mood_effect += card.mood_effect
             training_effectiveness += card.training_effectiveness
@@ -244,7 +244,7 @@ class UmaState(pyspiel.State):
         if self._phase == Phase.PLACEMENT:
             return self.get_game().placement_outcomes[self._placement_index]
         assert self._pending_action is not None
-        p_fail = self._failure_probability(self._pending_action)
+        p_fail = self.failure_probability(self._pending_action)
         return [(CHANCE_FAIL, p_fail), (CHANCE_SUCCESS, 1.0 - p_fail)]
 
     def _apply_stats(self, gains: Sequence[int]) -> tuple[int, ...]:
@@ -284,15 +284,15 @@ class UmaState(pyspiel.State):
 
         if success or action == WIT_ACTION:
             # Energy recovery is read before friendships move this turn.
-            self._energy = clip_energy(self._energy + self._energy_delta(action))
+            self._energy = clip_energy(self._energy + self.energy_delta(action))
 
-        gains = self._training_gains(action) if success else FAIL_STATS[action]
+        gains = self.training_gains(action) if success else FAIL_STATS[action]
         if success and action in TRAINING_ACTIONS:
             uses = list(self._facility_uses)
             uses[action - 1] += 1
             self._facility_uses = tuple(uses)
             card_states = list(self._card_states)
-            for index in self._attending(action):
+            for index in self.attending(action):
                 card_state = card_states[index]
                 card_states[index] = CardState(
                     min(
@@ -383,7 +383,7 @@ class UmaState(pyspiel.State):
         if action not in range(NUM_ACTIONS):
             raise ValueError(f"Invalid action: {action}")
 
-        p_fail = self._failure_probability(action)
+        p_fail = self.failure_probability(action)
         if 0.0 < p_fail < 1.0:
             self._pending_action = action
             self._phase = Phase.RESULT
@@ -417,13 +417,13 @@ class UmaState(pyspiel.State):
     def _support_lines_for(self, action: int) -> list[str]:
         cards = self.get_game().cards
         lines = []
-        for index in self._attending(action):
+        for index in self.attending(action):
             card = cards[index]
             card_state = self._card_states[index]
             prefix = (
                 "* "
                 if TRAINING_FOR_STAT[card.main_stat] == action
-                and self._is_rainbow(index)
+                and self.is_rainbow(index)
                 else ""
             )
             if card_state.friendship >= RAINBOW_FRIENDSHIP:
@@ -485,8 +485,8 @@ class UmaState(pyspiel.State):
         for action, stat in enumerate(self.stats[:5], start=1):
             col = [f"Lv. {self.facility_level(action)}", stat]
             if show_next_training:
-                col.append(self._training_gains(action))
-                col.append(f"{self._failure_probability(action) * 100:.0f}% fail")
+                col.append(self.training_gains(action))
+                col.append(f"{self.failure_probability(action) * 100:.0f}% fail")
                 col.extend(self._support_lines_for(action))
             training_cols.append(col)
         lines.append(
