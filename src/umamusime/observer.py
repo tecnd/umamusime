@@ -39,7 +39,7 @@ class UmaObserver:
         # Scaled to roughly [0, 1] so the values are usable as network inputs.
         speed, stamina, power, guts, wit, skill_points = state.stats
         self.tensor[:] = 0.0
-        self.tensor[:13] = (
+        self.tensor[: self._BASE_FEATURES] = (
             state.turn / MAX_TURNS,
             speed / MAX_STAT,
             stamina / MAX_STAT,
