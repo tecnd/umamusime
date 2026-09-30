@@ -198,33 +198,6 @@ class UmaState(pyspiel.State):
         energy_after = self._energy + self._energy_delta(action)
         return train_failure_chance(action, energy_after)
 
-    def training_features(self, action: int) -> tuple[tuple[int, ...], float, int, int]:
-        """Return the action outcomes needed by the observation."""
-        if action not in range(NUM_ACTIONS):
-            raise ValueError(f"Invalid action: {action}")
-        return (
-            self._training_gains(action),
-            self._failure_probability(action),
-            self._energy_delta(action),
-            len(self._attending(action)) if action in TRAINING_ACTIONS else 0,
-        )
-
-    def rainbow_count(self, action: int) -> int:
-        """Return matching rainbow cards attending a training facility."""
-        if action not in TRAINING_ACTIONS:
-            raise ValueError(f"Invalid training action: {action}")
-        return sum(
-            TRAINING_FOR_STAT[self.get_game().cards[index].main_stat] == action
-            and self._is_rainbow(index)
-            for index in self._attending(action)
-        )
-
-    def is_rainbow(self, index: int) -> bool:
-        """Return whether a support card has reached rainbow friendship."""
-        if index not in range(NUM_CARDS):
-            raise ValueError(f"Invalid card index: {index}")
-        return self._is_rainbow(index)
-
     def _training_gains(self, action: int) -> tuple[int, ...]:
         """Stat gains of a successful training, including support card effects."""
         if action == REST_ACTION:

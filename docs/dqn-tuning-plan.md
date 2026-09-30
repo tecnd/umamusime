@@ -1,12 +1,11 @@
 # DQN tuning plan
 
-Status: **executed.** The implementation is now in `src/umamusime/bots/dqn.py`,
-`src/umamusime/observer.py`, and `src/umamusime/state.py`. This document
-records the original DQN setup in `src/umamusime/bots/dqn.py`, the
+Status: **plan only, not executed.** Nothing in `src/` has changed yet. This
+document records the current DQN setup in `src/umamusime/bots/dqn.py`, the
 problems found by reading it against OpenSpiel's `pytorch/dqn.py`, throwaway
-probe measurements, and the ordered steps used to raise the greedy score
-while keeping training under 5 minutes. Final shipped settings and
-verification results are summarized in `docs/dqn-tuning.md`.
+probe measurements, and the ordered steps to raise the greedy score while
+keeping training under 5 minutes. When the work is done, replace this file
+with a `dqn-tuning.md` in the style of `mcts-tuning.md`.
 
 ## Current setup
 

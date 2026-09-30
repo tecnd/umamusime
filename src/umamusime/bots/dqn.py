@@ -1,5 +1,4 @@
 import pathlib
-import statistics
 import time
 
 import torch
@@ -10,10 +9,11 @@ from ..calendar import MAX_TURNS
 from ..game import UmaGame
 from ..state import UmaState
 
-# Rich observations, linear exploration, and a larger replay buffer reached
-# about 6476 mean score on 30 held-out seeds in a 99-second probe run.
-_TRAINING_EPISODES = 6000
-_TRAINING_SEED = 42
+# 600 episodes leaves the greedy policy short of the speed/wit line the
+# network is clearly able to learn; 1500 is where a sweep of 600–10000
+# plateaued (mean ~4940 on the three compare seeds). Longer runs cost
+# minutes and bounce around the same band.
+_TRAINING_EPISODES = 1500
 _EVAL_EVERY = 200
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
 
@@ -34,59 +34,28 @@ def _save(agent: dqn.DQN, path: pathlib.Path) -> None:
 
 def _make_env_and_agent() -> tuple[rl_environment.Environment, dqn.DQN]:
     env = rl_environment.Environment(UmaGame())
-    env.seed(_TRAINING_SEED)
     agent = dqn.DQN(
         player_id=0,
         state_representation_size=env.observation_spec()["info_state"][0],
         num_actions=env.action_spec()["num_actions"],
         hidden_layers_sizes=[64, 64],
-        replay_buffer_capacity=50000,
+        replay_buffer_capacity=10000,
         batch_size=128,
         learning_rate=0.01,
         optimizer_str=dqn.Optimiser.ADAM,
-        learn_every=4,
-        update_target_network_every=500,
-        epsilon_end=0.05,
-        epsilon_decay_schedule_str=dqn.EpsilonDecaySchedule.LINEAR,
-        epsilon_decay_duration=int(_TRAINING_EPISODES * MAX_TURNS * 0.6),
-        seed=_TRAINING_SEED,
+        epsilon_decay_duration=_TRAINING_EPISODES * MAX_TURNS // 2,
     )
     return env, agent
 
 
-def _evaluate(
-    env: rl_environment.Environment,
-    agent: dqn.DQN,
-    *,
-    first_seed: int = 1000,
-    num_seeds: int = 30,
-) -> tuple[float, float, float, int]:
-    """Return mean, population SD, median score, and finish count."""
-    scores: list[float] = []
-    finished = 0
-    for seed in range(first_seed, first_seed + num_seeds):
-        env.seed(seed)
-        time_step = env.reset()
-        while not time_step.last():
-            agent_output = agent.step(time_step, is_evaluation=True)
-            time_step = env.step([agent_output.action])
-        state = env.get_state
-        scores.append(state.returns()[0])
-        finished += not state.ended_by_race_fail()
-    return (
-        statistics.fmean(scores),
-        statistics.pstdev(scores),
-        statistics.median(scores),
-        finished,
-    )
-
-
-def _evaluation_summary(env: rl_environment.Environment, agent: dqn.DQN) -> str:
-    mean, standard_deviation, median, finished = _evaluate(env, agent)
-    return (
-        f"greedy mean {mean:.0f}, median {median:.0f}, "
-        f"sd {standard_deviation:.0f}, finished {finished}/30"
-    )
+def _eval_return(env: rl_environment.Environment, agent: dqn.DQN) -> float:
+    time_step = env.reset()
+    total = 0.0
+    while not time_step.last():
+        agent_output = agent.step(time_step, is_evaluation=True)
+        time_step = env.step([agent_output.action])
+        total += time_step.rewards[0]
+    return total
 
 
 def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> None:
@@ -99,7 +68,7 @@ def _train(env: rl_environment.Environment, agent: dqn.DQN, *, log: bool) -> Non
         if log and (episode + 1) % _EVAL_EVERY == 0:
             print(
                 f"Episode {episode + 1}, loss {agent.loss}, "
-                f"{_evaluation_summary(env, agent)}"
+                f"greedy return {_eval_return(env, agent)}"
             )
 
 
@@ -129,16 +98,9 @@ def play(
         if verbose:
             print(f"Saved {checkpoint}")
     else:
-        try:
-            agent.load(checkpoint)
-        except (KeyError, RuntimeError):
-            if verbose:
-                print(f"Checkpoint {checkpoint} is incompatible; retraining")
-            _train(env, agent, log=verbose)
-            _save(agent, checkpoint)
-        else:
-            if verbose:
-                print(f"Loaded {checkpoint}, skipping training")
+        agent.load(checkpoint)
+        if verbose:
+            print(f"Loaded {checkpoint}, skipping training")
 
     # Seed only the evaluation episode so training stays independent of it.
     if seed is not None:
