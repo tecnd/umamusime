@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Protocol, cast
+from typing import Protocol
 
 import numpy as np
 
@@ -44,7 +44,7 @@ def play(
     try:
         advance_chance(state, env_rng)
         while not state.is_terminal():
-            action = int(bot.predict(cast(UmaState, state.clone())))
+            action = int(bot.predict(state.clone()))
             if action not in state.legal_actions():
                 raise ValueError(
                     f"Illegal action {action}; legal: {state.legal_actions()}"
