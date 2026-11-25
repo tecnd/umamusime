@@ -38,7 +38,9 @@ def play(
 ) -> PlayResult:
     game = game or UmaGame()
     state: UmaState = game.new_initial_state()
-    env_rng = split_rngs(seed)[0] if seed is not None else np.random.RandomState()
+    env_rng = (
+        split_rngs(seed).career_rng if seed is not None else np.random.RandomState()
+    )
     actions: list[int] = []
 
     try:

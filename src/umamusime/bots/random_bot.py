@@ -23,7 +23,7 @@ def play(
     seed: int | None = 42,
     game: UmaGame | None = None,
 ) -> base.PlayResult:
-    bot_rng = split_rngs(seed)[1] if seed is not None else None
+    bot_rng = split_rngs(seed).bot_rng if seed is not None else None
     return base.play(RandomBot(bot_rng), game=game, seed=seed, verbose=verbose)
 
 
