@@ -22,6 +22,7 @@ class PlayResult:
 
 
 def advance_chance(state: UmaState, rng: np.random.RandomState) -> None:
+    """Resolve chance nodes in place until a decision or terminal node is reached."""
     while not state.is_terminal() and state.is_chance_node():
         outcomes, probs = zip(*state.chance_outcomes())
         state.apply_action(int(rng.choice(outcomes, p=probs)))
