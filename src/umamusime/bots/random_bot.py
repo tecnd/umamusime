@@ -1,31 +1,30 @@
+import numpy as np
 from open_spiel.python.bots.uniform_random import UniformRandomBot
 
 from ..game import UmaGame
 from ..rng import split_rngs
 from ..state import UmaState
+from . import base
 
 
-def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
-    game = UmaGame()
-    state: UmaState = game.new_initial_state()
-    env_rng, bot_rng = split_rngs(seed)
-    bot = UniformRandomBot(0, bot_rng)
-    player_actions: list[int] = []
-    while not state.is_terminal():
-        if state.is_chance_node():
-            outcomes, probs = zip(*state.chance_outcomes())
-            action = env_rng.choice(outcomes, p=probs)
-        else:
-            action = bot.step(state)
-            player_actions.append(int(action))
-        if verbose:
-            print(state.action_to_string(state.current_player(), action))
-        state.apply_action(action)
-        if verbose:
-            print(state)
-    if verbose:
-        print(f"Returns: {state.returns()}")
-    return state, player_actions
+class RandomBot:
+    """Uniform random bot implementing the Umamusime Bot protocol."""
+
+    def __init__(self, rng: np.random.RandomState | None = None) -> None:
+        self._bot = UniformRandomBot(0, rng or np.random.RandomState())
+
+    def predict(self, state: UmaState) -> int:
+        return int(self._bot.step(state))
+
+
+def play(
+    *,
+    verbose: bool = True,
+    seed: int | None = 42,
+    game: UmaGame | None = None,
+) -> base.PlayResult:
+    bot_rng = split_rngs(seed)[1] if seed is not None else None
+    return base.play(RandomBot(bot_rng), game=game, seed=seed, verbose=verbose)
 
 
 def main() -> None:

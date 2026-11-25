@@ -29,7 +29,8 @@ Useful entry points:
 - `src/umamusime/training.py`, `cards.py`, `scoring.py`, and `calendar.py` hold game data and pure calculations.
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation (115 floats, layout in `docs/dqn-tuning.md`).
-- `src/umamusime/bots/` contains human, random, MCTS, and DQN players; `compare.py` benchmarks selected bots.
+- `src/umamusime/bots/base.py` defines the `Bot` protocol (`predict(state)`), `PlayResult`, `advance_chance()`, and the shared career runner `play()` (re-exported from `umamusime.bots`).
+- `src/umamusime/bots/` contains human, random, MCTS, and DQN players built on `base.play()`; `compare.py` benchmarks selected bots on paired career seeds.
 - `docs/rules.md` is the gameplay specification; `docs/mcts-tuning.md` and `docs/dqn-tuning.md` explain the shipped MCTS and DQN parameters.
 - `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
