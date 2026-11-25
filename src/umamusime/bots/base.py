@@ -44,7 +44,7 @@ def play(
     try:
         advance_chance(state, env_rng)
         while not state.is_terminal():
-            action = int(bot.predict(state.clone()))
+            action = bot.predict(state.clone())
             if action not in state.legal_actions():
                 raise ValueError(
                     f"Illegal action {action}; legal: {state.legal_actions()}"
