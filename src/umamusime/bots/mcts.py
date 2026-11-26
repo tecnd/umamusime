@@ -70,6 +70,8 @@ class MCTSBot:
             # metadata check. This game already implements returns() and the
             # rest of the State API MCTS needs; per-turn rewards stay on the
             # default game for DQN.
+            # get_parameters() includes the deck and race schedule objects.
+            # UmaGame lifts those out before they reach OpenSpiel's param map.
             game = UmaGame(
                 params=params,
                 reward_model=pyspiel.GameType.RewardModel.TERMINAL,

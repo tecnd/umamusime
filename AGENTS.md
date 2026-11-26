@@ -37,6 +37,7 @@ Useful entry points:
 ## Conventions and pitfalls
 
 - Preserve OpenSpiel's explicit phases: six support-placement chance nodes, one player decision, then an optional fail/success chance node.
+- Pass the support deck and race schedule as `UmaGame(cards=..., races=...)` sequences of `SupportCard` and `CareerRace`. OpenSpiel's parameter map only accepts primitive values, so those objects stay off the registered specification. `get_parameters()` still returns them for in-process copies such as the MCTS search game.
 - Keep stat/action tuple indices aligned through the constants in `actions.py`; skill points are the sixth stat but have no facility or growth parameter.
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
 - Each bot module under `src/umamusime/bots/` should define two things: a class implementing the `Bot` protocol (`predict(state: UmaState) -> int`) and a `play()` function that optionally accepts a `seed` and delegates running a career to `base.play()`.
