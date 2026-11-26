@@ -2,7 +2,7 @@ import numpy as np
 import pyspiel
 from open_spiel.python.algorithms import mcts as openspiel_mcts
 
-from ..game import UmaGame
+from ..game import TERMINAL_GAME_TYPE, UmaGame
 from ..rng import split_rngs
 from ..state import UmaState
 from . import base
@@ -14,6 +14,23 @@ from . import base
 UCT_C = 200.0
 MAX_SIMULATIONS = 100
 N_ROLLOUTS = 15
+
+
+class _TerminalView:
+    """Presents a game to OpenSpiel's MCTSBot as terminal-reward.
+
+    MCTSBot only checks get_type() and reads max_utility(); the search runs on
+    the real state, whose rewards() are never consulted.
+    """
+
+    def __init__(self, game: UmaGame) -> None:
+        self._game = game
+
+    def get_type(self) -> pyspiel.GameType:
+        return TERMINAL_GAME_TYPE
+
+    def __getattr__(self, name: str):
+        return getattr(self._game, name)
 
 
 class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
@@ -60,33 +77,24 @@ class MCTSBot:
         self._max_simulations = max_simulations
         self._n_rollouts = n_rollouts
         self._random_state = random_state or np.random.RandomState()
+        self._evaluator = FastRolloutEvaluator(
+            n_rollouts=self._n_rollouts,
+            random_state=self._random_state,
+        )
         self._bot: openspiel_mcts.MCTSBot | None = None
-        self._game_params: dict[str, object] | None = None
+        self._game: UmaGame | None = None
 
     def _get_bot(self, state: UmaState) -> openspiel_mcts.MCTSBot:
-        params = dict(state.get_game().get_parameters())
-        if self._bot is None or params != self._game_params:
-            # MCTSBot rejects non-TERMINAL reward_model, but that is only a
-            # metadata check. This game already implements returns() and the
-            # rest of the State API MCTS needs; per-turn rewards stay on the
-            # default game for DQN.
-            # get_parameters() includes the deck and race schedule objects.
-            # UmaGame lifts those out before they reach OpenSpiel's param map.
-            game = UmaGame(
-                params=params,
-                reward_model=pyspiel.GameType.RewardModel.TERMINAL,
-            )
+        game = state.get_game()
+        if self._bot is None or game is not self._game:
             self._bot = openspiel_mcts.MCTSBot(
-                game,
+                _TerminalView(game),
                 uct_c=self._uct_c,
                 max_simulations=self._max_simulations,
-                evaluator=FastRolloutEvaluator(
-                    n_rollouts=self._n_rollouts,
-                    random_state=self._random_state,
-                ),
+                evaluator=self._evaluator,
                 random_state=self._random_state,
             )
-            self._game_params = params
+            self._game = game
         return self._bot
 
     def predict(self, state: UmaState) -> int:
