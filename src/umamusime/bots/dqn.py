@@ -190,6 +190,11 @@ def play(
     config: DQNConfig = CONFIG,
     game: UmaGame | None = None,
 ) -> base.PlayResult:
+    """Play one greedy career, training and saving a checkpoint first if needed.
+
+    The checkpoint does not record which game it was trained on, so pass
+    retrain=True when game differs from the one that produced it.
+    """
     game = game or UmaGame()
     env, agent = _make_env_and_agent(config, game=game)
     if retrain or not checkpoint.exists():
