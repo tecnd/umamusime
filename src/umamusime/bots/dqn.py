@@ -109,8 +109,8 @@ class DQNBot:
     def predict(self, state: UmaState) -> int:
         with torch.inference_mode():
             action, _ = self._agent.act_epsilon_greedy(
-                state.observation_tensor(0),
-                state.legal_actions(0),
+                state.observation_tensor(),
+                state.legal_actions(),
                 0.0,
             )
         return int(action)
