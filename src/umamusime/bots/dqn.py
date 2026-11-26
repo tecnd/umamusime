@@ -78,8 +78,10 @@ def _save(agent: dqn.DQN, path: pathlib.Path) -> None:
 
 def _make_env_and_agent(
     config: DQNConfig = CONFIG,
+    *,
+    game: UmaGame | None = None,
 ) -> tuple[rl_environment.Environment, dqn.DQN]:
-    env = rl_environment.Environment(UmaGame())
+    env = rl_environment.Environment(game or UmaGame())
     agent = dqn.DQN(
         player_id=0,
         state_representation_size=env.observation_spec()["info_state"][0],
@@ -147,9 +149,10 @@ def _train(
     config: DQNConfig = CONFIG,
     *,
     log: bool,
+    game: UmaGame | None = None,
 ) -> None:
     env.seed(config.seed)
-    eval_game = UmaGame() if log else None
+    eval_game: UmaGame = game or env.game
     for episode in range(config.episodes):
         time_step = env.reset()
         while not time_step.last():
@@ -166,11 +169,13 @@ def train(
     verbose: bool = True,
     checkpoint: pathlib.Path = _CHECKPOINT,
     config: DQNConfig = CONFIG,
+    game: UmaGame | None = None,
 ) -> float:
     """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
-    env, agent = _make_env_and_agent(config)
+    game = game or UmaGame()
+    env, agent = _make_env_and_agent(config, game=game)
     started = time.perf_counter()
-    _train(env, agent, config, log=verbose)
+    _train(env, agent, config, log=verbose, game=game)
     elapsed = time.perf_counter() - started
     _save(agent, checkpoint)
     if verbose:
@@ -187,9 +192,10 @@ def play(
     config: DQNConfig = CONFIG,
     game: UmaGame | None = None,
 ) -> base.PlayResult:
-    env, agent = _make_env_and_agent(config)
+    game = game or UmaGame()
+    env, agent = _make_env_and_agent(config, game=game)
     if retrain or not checkpoint.exists():
-        _train(env, agent, config, log=verbose)
+        _train(env, agent, config, log=verbose, game=game)
         _save(agent, checkpoint)
         if verbose:
             print(f"Saved {checkpoint}")
