@@ -66,6 +66,13 @@ noise; the score of a single `compare.py` seed (for example 5643 / 2126 /
 6489 for one checkpoint) is far too noisy to tune on. Times below were
 measured with four sweeps sharing four cores and read 10–30% high.
 
+*Note:* The probes and sweeps below were scored while `dqn.evaluate()` ran
+through OpenSpiel's `rl_environment.Environment` (`RandomState(seed)`).
+`dqn.evaluate()` now delegates to `bots.base.play()`, which uses
+`split_rngs(seed).career_rng`; individual per-seed rolls on `1000..1029`
+differ from these historical numbers, though the underlying distribution is
+unchanged.
+
 ## Early probes (single training seed)
 
 | Variant | Mean | Finished |
@@ -84,13 +91,6 @@ together turn most careers into finished ones. Lower learning rate, Huber
 loss, and discounting all hurt, so `lr=0.01`, MSE, and `gamma=1.0` stayed.
 
 ## Sweeps (three training seeds each, mean of means)
-
-*Note:* The probes and sweeps below were scored while `dqn.evaluate()` ran
-through OpenSpiel's `rl_environment.Environment` (`RandomState(seed)`).
-`dqn.evaluate()` now delegates to `bots.base.play()`, which uses
-`split_rngs(seed).career_rng`; individual per-seed rolls on `1000..1029`
-differ from these historical numbers, though the underlying distribution is
-unchanged.
 
 Round 1, training seeds 42 / 7 / 123, target sync every 1000 unless noted:
 
