@@ -7,13 +7,14 @@ import torch
 from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import dqn
 
-from ..calendar import MAX_TURNS
 from ..game import UmaGame
 from ..state import UmaState
 from . import base
 
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
-_EVAL_EVERY = 1000
+# Greedy log cadence in agent steps. The old line fired every 1000 episodes,
+# and a career is ~34 agent steps, so this stays about as frequent.
+_EVAL_EVERY_STEPS = 34_000
 # Greedy evaluation careers use fixed seeds on a separate career runner so
 # logging never perturbs the training chance stream.
 _EVAL_SEED = 1000
@@ -24,7 +25,8 @@ _LOG_EVAL_CAREERS = 10
 class DQNConfig:
     """Hyperparameters; see docs/dqn-tuning.md for how they were chosen."""
 
-    episodes: int = 8000
+    # One per DQN.step call during training, including each episode's terminal step.
+    total_steps: int = 275_000
     hidden_layers: tuple[int, ...] = (64, 64)
     learning_rate: float = 0.01
     replay_buffer_capacity: int = 50_000
@@ -41,7 +43,7 @@ class DQNConfig:
 
     @property
     def epsilon_decay_duration(self) -> int:
-        return int(self.epsilon_decay_fraction * self.episodes * MAX_TURNS)
+        return int(self.epsilon_decay_fraction * self.total_steps)
 
 
 CONFIG = DQNConfig()
@@ -152,15 +154,23 @@ def _train(
 ) -> None:
     env.seed(config.seed)
     eval_game: UmaGame = env.game
-    for episode in range(config.episodes):
+    episode = 0
+    next_log_step = _EVAL_EVERY_STEPS
+    while agent.step_counter < config.total_steps:
         time_step = env.reset()
         while not time_step.last():
             agent_output = agent.step(time_step)
             time_step = env.step([agent_output.action])
         agent.step(time_step)
-        if log and (episode + 1) % _EVAL_EVERY == 0:
+        episode += 1
+        if log and agent.step_counter >= next_log_step:
             result = evaluate(agent, careers=_LOG_EVAL_CAREERS, game=eval_game)
-            print(f"Episode {episode + 1}, loss {agent.loss}, greedy {result}")
+            print(
+                f"Episode {episode}, step {agent.step_counter}, "
+                f"loss {agent.loss}, greedy {result}"
+            )
+            while next_log_step <= agent.step_counter:
+                next_log_step += _EVAL_EVERY_STEPS
 
 
 def train(
