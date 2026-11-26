@@ -1,17 +1,17 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import pyspiel
 
 from .actions import NODES_PER_TURN, NUM_ACTIONS, NUM_CARDS, NUM_PLACEMENT_OUTCOMES
 from .calendar import MAX_TURNS
-from .cards import SupportCard, cards_from_param, deck_param
+from .cards import DEFAULT_DECK, SupportCard
 from .observer import UmaObserver
 from .races import (
     DEFAULT_EVENTS,
     DEFAULT_INSPIRATION_SPEED,
     DEFAULT_INSPIRATION_STAMINA,
-    races_from_param,
-    races_param,
+    DEFAULT_RACES,
+    CareerRace,
 )
 from .scoring import MAX_STAT, SKILL_POINT_WEIGHT, stat_score
 from .state import UmaState
@@ -26,10 +26,11 @@ from .training import (
 )
 
 
-def _default_params() -> dict[str, str | int | float]:
+def _default_params() -> dict[str, int | float]:
+    # The deck and race schedule are Python objects on UmaGame. OpenSpiel's
+    # parameter map only accepts bool, int, float, and str, so they are
+    # omitted from this specification.
     return {
-        "cards": deck_param(),
-        "races": races_param(),
         "inspiration_speed": DEFAULT_INSPIRATION_SPEED,
         "inspiration_stamina": DEFAULT_INSPIRATION_STAMINA,
         **dict(zip(INITIAL_STAT_PARAMS, DEFAULT_INITIAL_STATS[:5], strict=True)),
@@ -38,7 +39,7 @@ def _default_params() -> dict[str, str | int | float]:
 
 
 def _make_game_type(
-    reward_model=pyspiel.GameType.RewardModel.REWARDS,
+    reward_model: pyspiel.GameType.RewardModel = pyspiel.GameType.RewardModel.REWARDS,
 ) -> pyspiel.GameType:
     return pyspiel.GameType(
         short_name="umamusime",
@@ -58,9 +59,10 @@ def _make_game_type(
     )
 
 
-# Per-turn rewards are real (used by DQN). MCTSBot only checks this metadata
-# and can be given TERMINAL via UmaGame(reward_model=...).
+# Per-turn rewards are real (used by DQN). OpenSpiel's MCTSBot only checks
+# this metadata, so MCTS passes TERMINAL_GAME_TYPE instead of this game.
 _GAME_TYPE = _make_game_type()
+TERMINAL_GAME_TYPE = _make_game_type(pyspiel.GameType.RewardModel.TERMINAL)
 
 
 def max_utility(cards: Sequence[SupportCard]) -> float:
@@ -90,37 +92,88 @@ def _game_info(cards: Sequence[SupportCard]) -> pyspiel.GameInfo:
     )
 
 
-class UmaGame(pyspiel.Game):
-    def __init__(self, params=None, *, reward_model=None):
-        params = dict(params or {})
-        for key, value in _default_params().items():
-            params.setdefault(key, value)
-        cards = cards_from_param(str(params["cards"]))
-        if len(cards) != NUM_CARDS:
-            raise ValueError(
-                f"Expected a deck of {NUM_CARDS} support cards, got {len(cards)}"
-            )
-        races = races_from_param(str(params["races"]))
-        for race in races:
-            if race.turn >= MAX_TURNS:
-                raise ValueError(
-                    f"Race {race.name!r} turn {race.turn} is outside 0..{MAX_TURNS - 1}"
-                )
-        # Skill points always start at 0 and have 0 UmaGrowth.
-        uma_growth = tuple(float(params[name]) for name in GROWTH_PARAMS) + (0.0,)
-        game_type = (
-            _make_game_type(reward_model) if reward_model is not None else _GAME_TYPE
+def _validate_deck(cards: object) -> tuple[SupportCard, ...]:
+    if isinstance(cards, str) or not isinstance(cards, Sequence):
+        raise TypeError(
+            f"cards must be a sequence of SupportCard (got {type(cards).__name__})"
         )
-        super().__init__(game_type, _game_info(cards), params)
-        self.cards = cards
-        self.races = races
-        self.races_by_turn = {race.turn: race for race in races}
+    deck: list[SupportCard] = []
+    for card in cards:
+        if not isinstance(card, SupportCard):
+            raise TypeError("cards must be a sequence of SupportCard")
+        deck.append(card)
+    if len(deck) != NUM_CARDS:
+        raise ValueError(
+            f"Expected a deck of {NUM_CARDS} support cards, got {len(deck)}"
+        )
+    return tuple(deck)
+
+
+def _require_int(field: str, value: object) -> int:
+    # bool is a subclass of int; CareerRace(True, ...) must not become turn 1.
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{field} must be an int, got {type(value).__name__}")
+    return value
+
+
+def _validate_races(races: object) -> tuple[CareerRace, ...]:
+    if isinstance(races, str) or not isinstance(races, Sequence):
+        raise TypeError(
+            f"races must be a sequence of CareerRace (got {type(races).__name__})"
+        )
+    schedule: list[CareerRace] = []
+    seen_turns: set[int] = set()
+    for race in races:
+        if not isinstance(race, CareerRace):
+            raise TypeError("races must be a sequence of CareerRace")
+        turn = _require_int("turn", race.turn)
+        _require_int("min_speed", race.min_speed)
+        _require_int("min_stamina", race.min_stamina)
+        if not race.name.strip():
+            raise ValueError("Race name is empty")
+        if turn < 0 or turn >= MAX_TURNS:
+            raise ValueError(
+                f"Race {race.name!r} turn {turn} is outside 0..{MAX_TURNS - 1}"
+            )
+        if turn in seen_turns:
+            raise ValueError(f"Duplicate race turn {turn}")
+        seen_turns.add(turn)
+        schedule.append(race)
+    return tuple(sorted(schedule, key=lambda race: race.turn))
+
+
+class UmaGame(pyspiel.Game):
+    def __init__(
+        self,
+        params: Mapping[str, int | float] | None = None,
+        *,
+        cards: Sequence[SupportCard] = DEFAULT_DECK,
+        races: Sequence[CareerRace] = DEFAULT_RACES,
+    ) -> None:
+        raw = dict(_default_params())
+        if params:
+            unknown = sorted(set(params) - set(raw))
+            if unknown:
+                names = ", ".join(unknown)
+                raise ValueError(
+                    f"Unknown parameter(s): {names}. "
+                    "Pass cards= and races= as keyword arguments."
+                )
+            raw.update(params)
+        deck = _validate_deck(cards)
+        schedule = _validate_races(races)
+        # Skill points always start at 0 and have 0 UmaGrowth.
+        uma_growth = tuple(float(raw[name]) for name in GROWTH_PARAMS) + (0.0,)
+        super().__init__(_GAME_TYPE, _game_info(deck), raw)
+        self.cards = deck
+        self.races = schedule
+        self.races_by_turn = {race.turn: race for race in schedule}
         self.events_by_turn = {event.turn: event for event in DEFAULT_EVENTS}
-        self.inspiration_speed = int(params["inspiration_speed"])
-        self.inspiration_stamina = int(params["inspiration_stamina"])
+        self.inspiration_speed = int(raw["inspiration_speed"])
+        self.inspiration_stamina = int(raw["inspiration_stamina"])
         self.uma_growth = uma_growth
         self.placement_outcomes = tuple(placement_outcomes(card) for card in self.cards)
-        base = tuple(int(params[name]) for name in INITIAL_STAT_PARAMS) + (0,)
+        base = tuple(int(raw[name]) for name in INITIAL_STAT_PARAMS) + (0,)
         self.initial_stats = summed_initial_stats(self.cards, base)
         self.skill_point_obs_scale = max(
             1, max_skill_points_per_turn(self.cards) * MAX_TURNS

@@ -10,7 +10,7 @@ In years 2 and 3, Early July through Late August (inclusive) are summer camp tur
 
 Scheduled career races replace the training turn. When the calendar reaches a race turn, the run checks speed and stamina against that race's minimums (after any pre-turn events for that half-month). Failing either check is a **soft fail** and ends the career immediately. Passing skips training for that turn and continues at the next half-month (or Finale turn).
 
-The race list is the OpenSpiel `races` param: comma-separated `turn:name:min_speed:min_stamina` entries. Defaults:
+The race list is passed directly as `UmaGame(races=...)`: a sequence of `CareerRace(turn, name, min_speed, min_stamina)`, defaulting to `races.DEFAULT_RACES`. `turn`, `min_speed`, and `min_stamina` are integers (`bool` is rejected). Each turn is from 0 through 77, and each turn appears once. The schedule is stored in turn order on the Python game. It is not an OpenSpiel parameter. `pyspiel.load_game` builds `DEFAULT_RACES`. Defaults:
 
 | Turn | Label | Race | Speed | Stamina |
 | --- | --- | --- | --- | --- |
@@ -87,7 +87,7 @@ Each level-up adds +1 to the main stat. The first two level-ups cost 1 more ener
 
 ## Support cards
 
-The deck is always exactly six cards, passed as the `cards` game parameter (comma-separated names) and defaulting to `cards.DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the `initial_{stat}` OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`. Skill points always have 0 growth. Career races are the `races` param (see above). Inspiration flat buffs are `inspiration_speed` and `inspiration_stamina` (defaults 50). Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
+The deck is always exactly six `SupportCard`s, passed directly as `UmaGame(cards=...)` and defaulting to `cards.DEFAULT_DECK`. Each value is the card itself, so a deck can include cards defined outside the default six. The deck is not an OpenSpiel parameter. `params` only accepts the scalar parameters `inspiration_speed`, `inspiration_stamina`, `initial_speed`, `initial_stamina`, `initial_power`, `initial_guts`, `initial_wit`, `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`; unknown keys raise `ValueError`. Custom decks and schedules do not survive OpenSpiel round trips: the game string, `serialize_game_and_state`, and pickling a state rebuild the default deck and race schedule, and an unpickled `UmaGame` has no deck or schedule at all because pickling skips `UmaGame.__init__`. `pyspiel.load_game` builds `DEFAULT_DECK`. Starting speed, stamina, power, guts, and wit are the `initial_{stat}` OpenSpiel params plus each card's initial grants; skill points are not parameterized. UmaGrowth is controlled independently by `speed_growth`, `stamina_growth`, `power_growth`, `guts_growth`, and `wit_growth`. Skill points always have 0 growth. Inspiration flat buffs are `inspiration_speed` and `inspiration_stamina` (defaults 50). Only these card stats are modelled: main stat type, friendship bonus, initial friendship, training effectiveness, mood effect, initial {stat}, {stat} bonus, wit friendship recovery, and specialty priority.
 
 ### Default deck
 
