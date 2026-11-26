@@ -25,10 +25,10 @@ class DQNConfig:
     """Hyperparameters; see docs/dqn-tuning.md for how they were chosen."""
 
     # One per DQN.step call during training, including each episode's terminal step.
-    total_steps: int = 275_000
+    total_steps: int = 400_000
     hidden_layers: tuple[int, ...] = (64, 64)
     learning_rate: float = 0.01
-    replay_buffer_capacity: int = 50_000
+    replay_buffer_capacity: int = 100_000
     batch_size: int = 128
     learn_every: int = 10
     update_target_network_every: int = 250
