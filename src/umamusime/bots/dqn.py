@@ -12,8 +12,7 @@ from ..state import UmaState
 from . import base
 
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
-# Greedy log cadence in agent steps. The old line fired every 1000 episodes,
-# and a career is ~34 agent steps, so this stays about as frequent.
+# Agent steps between greedy evaluation log lines during training.
 _EVAL_EVERY_STEPS = 34_000
 # Greedy evaluation careers use fixed seeds on a separate career runner so
 # logging never perturbs the training chance stream.
@@ -38,7 +37,7 @@ class DQNConfig:
     # Fraction of training steps over which epsilon falls linearly to its
     # floor. OpenSpiel's default "exp" schedule never gets below
     # end + (1 - end) / e (~0.43 here), so the policy would stay mostly random.
-    epsilon_decay_fraction: float = 0.6
+    epsilon_decay_fraction: float = 0.3
     seed: int = 42
 
     @property
