@@ -149,10 +149,9 @@ def _train(
     config: DQNConfig = CONFIG,
     *,
     log: bool,
-    game: UmaGame | None = None,
 ) -> None:
     env.seed(config.seed)
-    eval_game: UmaGame = game or env.game
+    eval_game: UmaGame = env.game
     for episode in range(config.episodes):
         time_step = env.reset()
         while not time_step.last():
@@ -172,10 +171,9 @@ def train(
     game: UmaGame | None = None,
 ) -> float:
     """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
-    game = game or UmaGame()
     env, agent = _make_env_and_agent(config, game=game)
     started = time.perf_counter()
-    _train(env, agent, config, log=verbose, game=game)
+    _train(env, agent, config, log=verbose)
     elapsed = time.perf_counter() - started
     _save(agent, checkpoint)
     if verbose:
@@ -195,7 +193,7 @@ def play(
     game = game or UmaGame()
     env, agent = _make_env_and_agent(config, game=game)
     if retrain or not checkpoint.exists():
-        _train(env, agent, config, log=verbose, game=game)
+        _train(env, agent, config, log=verbose)
         _save(agent, checkpoint)
         if verbose:
             print(f"Saved {checkpoint}")
