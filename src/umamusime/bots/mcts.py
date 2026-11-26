@@ -1,9 +1,11 @@
+import numpy as np
 import pyspiel
 from open_spiel.python.algorithms import mcts as openspiel_mcts
 
 from ..game import UmaGame
 from ..rng import split_rngs
 from ..state import UmaState
+from . import base
 
 # Full-career random rollouts, uct_c=200, 100 simulations, and 15 rollouts:
 # on 96 paired seeds that beat a 6-turn cutoff by +1981 ± 358 (12 finished
@@ -43,37 +45,61 @@ class FastRolloutEvaluator(openspiel_mcts.RandomRolloutEvaluator):
         return [total / self.n_rollouts]
 
 
-def play(*, verbose: bool = True, seed: int = 42) -> tuple[UmaState, list[int]]:
-    # MCTSBot rejects non-TERMINAL reward_model, but that is only a metadata
-    # check. This game already implements returns() and the rest of the State
-    # API MCTS needs; per-turn rewards stay on the default game for DQN.
-    game = UmaGame(reward_model=pyspiel.GameType.RewardModel.TERMINAL)
-    state: UmaState = game.new_initial_state()
-    env_rng, search_rng = split_rngs(seed)
-    bot = openspiel_mcts.MCTSBot(
-        game,
-        uct_c=UCT_C,
-        max_simulations=MAX_SIMULATIONS,
-        evaluator=FastRolloutEvaluator(n_rollouts=N_ROLLOUTS, random_state=search_rng),
-        random_state=search_rng,
-    )
-    player_actions: list[int] = []
-    while not state.is_terminal():
-        if state.is_chance_node():
-            outcomes, probs = zip(*state.chance_outcomes())
-            action = env_rng.choice(outcomes, p=probs)
-            action_label = None
-        else:
-            action = bot.step(state)
-            player_actions.append(int(action))
-            action_label = state.action_to_string(state.current_player(), action)
-        state.apply_action(action)
-        if verbose and action_label is not None:
-            print(action_label)
-            print(state)
-    if verbose:
-        print(f"Returns: {state.returns()}")
-    return state, player_actions
+class MCTSBot:
+    """MCTS player implementing the Umamusime Bot protocol."""
+
+    def __init__(
+        self,
+        *,
+        uct_c: float = UCT_C,
+        max_simulations: int = MAX_SIMULATIONS,
+        n_rollouts: int = N_ROLLOUTS,
+        random_state: np.random.RandomState | None = None,
+    ) -> None:
+        self._uct_c = uct_c
+        self._max_simulations = max_simulations
+        self._n_rollouts = n_rollouts
+        self._random_state = random_state or np.random.RandomState()
+        self._bot: openspiel_mcts.MCTSBot | None = None
+        self._game_params: dict[str, object] | None = None
+
+    def _get_bot(self, state: UmaState) -> openspiel_mcts.MCTSBot:
+        params = dict(state.get_game().get_parameters())
+        if self._bot is None or params != self._game_params:
+            # MCTSBot rejects non-TERMINAL reward_model, but that is only a
+            # metadata check. This game already implements returns() and the
+            # rest of the State API MCTS needs; per-turn rewards stay on the
+            # default game for DQN.
+            game = UmaGame(
+                params=params,
+                reward_model=pyspiel.GameType.RewardModel.TERMINAL,
+            )
+            self._bot = openspiel_mcts.MCTSBot(
+                game,
+                uct_c=self._uct_c,
+                max_simulations=self._max_simulations,
+                evaluator=FastRolloutEvaluator(
+                    n_rollouts=self._n_rollouts,
+                    random_state=self._random_state,
+                ),
+                random_state=self._random_state,
+            )
+            self._game_params = params
+        return self._bot
+
+    def predict(self, state: UmaState) -> int:
+        return int(self._get_bot(state).step(state))
+
+
+def play(
+    *,
+    verbose: bool = True,
+    seed: int | None = 42,
+    game: UmaGame | None = None,
+) -> base.PlayResult:
+    search_rng = split_rngs(seed).bot_rng if seed is not None else None
+    bot = MCTSBot(random_state=search_rng)
+    return base.play(bot, game=game, seed=seed, verbose=verbose)
 
 
 def main() -> None:

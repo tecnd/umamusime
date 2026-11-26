@@ -21,7 +21,7 @@ to raise the greedy score inside a 5-minute training budget. Defaults live in
 | Observation | 115 floats | 55 floats |
 | Training seed | 42 | unseeded environment |
 
-Training takes about 130–140 s on one CPU thread (137.9 s inside
+Training takes about 130–145 s on one CPU thread (142.2 s inside
 `umamusime.compare`), well under the 5-minute cap. The MLP is too small for
 intra-op threading to help.
 
@@ -65,6 +65,13 @@ the same config spread by roughly ±300, so differences under about 300 are
 noise; the score of a single `compare.py` seed (for example 5643 / 2126 /
 6489 for one checkpoint) is far too noisy to tune on. Times below were
 measured with four sweeps sharing four cores and read 10–30% high.
+
+*Note:* The probes and sweeps below were scored while `dqn.evaluate()` ran
+through OpenSpiel's `rl_environment.Environment` (`RandomState(seed)`).
+`dqn.evaluate()` now delegates to `bots.base.play()`, which uses
+`split_rngs(seed).career_rng`; individual per-seed rolls on `1000..1029`
+differ from these historical numbers, though the underlying distribution is
+unchanged.
 
 ## Early probes (single training seed)
 
@@ -154,13 +161,13 @@ seeds with 73/180 finished, against 6491 and 140/180 without. Not adopted.
 
 ## Result
 
-`uv run python -m umamusime.compare` after tuning (seeds 42–44):
+`uv run python -m umamusime.compare` after tuning (paired seeds 42–44):
 
 | Method | Runs | Best | Time |
 | --- | --- | --- | --- |
 | Random | 954, 637, 1027 | 1027 | instant |
-| MCTS | 5960, 4442, 2903 | 5960 | 47 s per game |
-| DQN | 6004, 6299, 6364 | 6364, finished | 138 s train |
+| MCTS | 5960, 4442, 2903 | 5960 | 48 s per game |
+| DQN | 6413, 5983, 6435 | 6435, finished | 142 s train |
 
 Before tuning the shipped checkpoint scored 1760 / 1900 / 1812 in about
 15 s of training, and 1706 on average (0/30 finished) over 30 fresh seeds.

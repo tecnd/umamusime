@@ -29,7 +29,8 @@ Useful entry points:
 - `src/umamusime/training.py`, `cards.py`, `scoring.py`, and `calendar.py` hold game data and pure calculations.
 - `src/umamusime/actions.py` defines shared action/stat indices; tuple ordering is `speed, stamina, power, guts, wit, skill_points`.
 - `src/umamusime/observer.py` builds the normalized RL observation (115 floats, layout in `docs/dqn-tuning.md`).
-- `src/umamusime/bots/` contains human, random, MCTS, and DQN players; `compare.py` benchmarks selected bots.
+- `src/umamusime/bots/base.py` defines the `Bot` protocol (`predict(state)`), `PlayResult`, `advance_chance()`, and the shared career runner `play()` (re-exported from `umamusime.bots`).
+- `src/umamusime/bots/` contains human, random, MCTS, and DQN players built on `base.play()`; `compare.py` benchmarks selected bots on paired career seeds.
 - `docs/rules.md` is the gameplay specification; `docs/mcts-tuning.md` and `docs/dqn-tuning.md` explain the shipped MCTS and DQN parameters.
 - `typings/pyspiel.pyi` supplies local OpenSpiel types for ty and is excluded as project source.
 
@@ -38,6 +39,7 @@ Useful entry points:
 - Preserve OpenSpiel's explicit phases: six support-placement chance nodes, one player decision, then an optional fail/success chance node.
 - Keep stat/action tuple indices aligned through the constants in `actions.py`; skill points are the sixth stat but have no facility or growth parameter.
 - Use `UmaGame(reward_model=TERMINAL)` only for MCTS metadata compatibility; the default per-turn reward model is required by DQN.
+- Each bot module under `src/umamusime/bots/` should define two things: a class implementing the `Bot` protocol (`predict(state: UmaState) -> int`) and a `play()` function that optionally accepts a `seed` and delegates running a career to `base.play()`.
 - Seed NumPy/OpenSpiel paths when reproducibility matters. Split each play
   seed with `SeedSequence.spawn(2)` into separate career and bot/search
   `RandomState`s (`rng.split_rngs`) so decision randomness does not reshuffle

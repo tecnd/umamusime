@@ -10,10 +10,11 @@ from open_spiel.python.pytorch import dqn
 from ..calendar import MAX_TURNS
 from ..game import UmaGame
 from ..state import UmaState
+from . import base
 
 _CHECKPOINT = pathlib.Path("dqn_checkpoint.pt")
 _EVAL_EVERY = 1000
-# Greedy evaluation careers use fixed seeds on a separate environment so
+# Greedy evaluation careers use fixed seeds on a separate career runner so
 # logging never perturbs the training chance stream.
 _EVAL_SEED = 1000
 _LOG_EVAL_CAREERS = 10
@@ -77,8 +78,10 @@ def _save(agent: dqn.DQN, path: pathlib.Path) -> None:
 
 def _make_env_and_agent(
     config: DQNConfig = CONFIG,
+    *,
+    game: UmaGame | None = None,
 ) -> tuple[rl_environment.Environment, dqn.DQN]:
-    env = rl_environment.Environment(UmaGame())
+    env = rl_environment.Environment(game or UmaGame())
     agent = dqn.DQN(
         player_id=0,
         state_representation_size=env.observation_spec()["info_state"][0],
@@ -99,26 +102,38 @@ def _make_env_and_agent(
     return env, agent
 
 
+class DQNBot:
+    """Greedy DQN player implementing the Umamusime Bot protocol."""
+
+    def __init__(self, agent: dqn.DQN) -> None:
+        self._agent = agent
+
+    def predict(self, state: UmaState) -> int:
+        with torch.inference_mode():
+            action, _ = self._agent.act_epsilon_greedy(
+                state.observation_tensor(),
+                state.legal_actions(),
+                0.0,
+            )
+        return int(action)
+
+
 def evaluate(
     agent: dqn.DQN,
     *,
     careers: int = 30,
     first_seed: int = _EVAL_SEED,
-    env: rl_environment.Environment | None = None,
+    game: UmaGame | None = None,
 ) -> EvalResult:
     """Greedy careers on seeds first_seed..first_seed + careers - 1."""
-    env = env or rl_environment.Environment(UmaGame())
+    game = game or UmaGame()
+    bot = DQNBot(agent)
     scores: list[float] = []
     finished = 0
     for seed in range(first_seed, first_seed + careers):
-        env.seed(seed)
-        time_step = env.reset()
-        while not time_step.last():
-            agent_output = agent.step(time_step, is_evaluation=True)
-            time_step = env.step([agent_output.action])
-        state: UmaState = env.get_state
-        scores.append(state.returns()[0])
-        finished += not state.ended_by_race_fail()
+        result = base.play(bot, game=game, seed=seed, verbose=False)
+        scores.append(result.state.returns()[0])
+        finished += not result.state.ended_by_race_fail()
     return EvalResult(
         mean=statistics.fmean(scores),
         stdev=statistics.pstdev(scores),
@@ -136,7 +151,7 @@ def _train(
     log: bool,
 ) -> None:
     env.seed(config.seed)
-    eval_env = rl_environment.Environment(UmaGame()) if log else None
+    eval_game: UmaGame = env.game
     for episode in range(config.episodes):
         time_step = env.reset()
         while not time_step.last():
@@ -144,7 +159,7 @@ def _train(
             time_step = env.step([agent_output.action])
         agent.step(time_step)
         if log and (episode + 1) % _EVAL_EVERY == 0:
-            result = evaluate(agent, careers=_LOG_EVAL_CAREERS, env=eval_env)
+            result = evaluate(agent, careers=_LOG_EVAL_CAREERS, game=eval_game)
             print(f"Episode {episode + 1}, loss {agent.loss}, greedy {result}")
 
 
@@ -153,9 +168,10 @@ def train(
     verbose: bool = True,
     checkpoint: pathlib.Path = _CHECKPOINT,
     config: DQNConfig = CONFIG,
+    game: UmaGame | None = None,
 ) -> float:
     """Train a new agent from scratch, overwrite the checkpoint, return seconds."""
-    env, agent = _make_env_and_agent(config)
+    env, agent = _make_env_and_agent(config, game=game)
     started = time.perf_counter()
     _train(env, agent, config, log=verbose)
     elapsed = time.perf_counter() - started
@@ -172,8 +188,15 @@ def play(
     seed: int | None = None,
     retrain: bool = False,
     config: DQNConfig = CONFIG,
-) -> tuple[UmaState, list[int]]:
-    env, agent = _make_env_and_agent(config)
+    game: UmaGame | None = None,
+) -> base.PlayResult:
+    """Play one greedy career, training and saving a checkpoint first if needed.
+
+    The checkpoint does not record which game it was trained on, so pass
+    retrain=True when game differs from the one that produced it.
+    """
+    game = game or UmaGame()
+    env, agent = _make_env_and_agent(config, game=game)
     if retrain or not checkpoint.exists():
         _train(env, agent, config, log=verbose)
         _save(agent, checkpoint)
@@ -184,23 +207,7 @@ def play(
         if verbose:
             print(f"Loaded {checkpoint}, skipping training")
 
-    # Seed only the evaluation episode so training stays independent of it.
-    if seed is not None:
-        env.seed(seed)
-    time_step = env.reset()
-    actions: list[int] = []
-    while not time_step.last():
-        agent_output = agent.step(time_step, is_evaluation=True)
-        action = int(agent_output.action)
-        actions.append(action)
-        if verbose:
-            print(env.get_state.action_to_string(0, action))
-        time_step = env.step([action])
-    state: UmaState = env.get_state
-    if verbose:
-        print(state)
-        print(f"Returns: {state.returns()}")
-    return state, actions
+    return base.play(DQNBot(agent), game=game, seed=seed, verbose=verbose)
 
 
 def main() -> None:

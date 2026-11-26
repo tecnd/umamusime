@@ -1,31 +1,33 @@
-import numpy as np
-from open_spiel.python.bots.human import HumanBot
+from open_spiel.python.bots.human import HumanBot as OpenSpielHumanBot
 
 from ..game import UmaGame
 from ..state import UmaState
+from . import base
 
 
-def play() -> UmaState:
-    game = UmaGame()
-    state: UmaState = game.new_initial_state()
-    bot = HumanBot()
-    try:
-        while not state.is_terminal():
-            if state.is_chance_node():
-                outcomes, probs = zip(*state.chance_outcomes())
-                action = np.random.choice(outcomes, p=probs)
-            else:
-                print(state)
-                action = bot.step(state)
-            state.apply_action(action)
-    except KeyboardInterrupt:
-        print("\nInterrupted — exiting.")
+class HumanBot:
+    """Interactive terminal player implementing the Umamusime Bot protocol."""
+
+    def __init__(self) -> None:
+        self._bot = OpenSpielHumanBot()
+
+    def predict(self, state: UmaState) -> int:
         print(state)
-        print(f"Returns so far: {state.returns()}")
-        return state
-    print(state)
-    print(f"Returns: {state.returns()}")
-    return state
+        return int(self._bot.step(state))
+
+
+def play(*, game: UmaGame | None = None, seed: int | None = None) -> base.PlayResult:
+    result = base.play(
+        HumanBot(),
+        game=game,
+        seed=seed,
+        verbose=False,
+        catch_interrupt=True,
+    )
+    if not result.interrupted:
+        print(result.state)
+        print(f"Returns: {result.state.returns()}")
+    return result
 
 
 def main() -> None:
