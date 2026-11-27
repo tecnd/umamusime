@@ -20,7 +20,7 @@ Useful entry points:
 - `uv run umamusime` — interactive human game.
 - `uv run python -m umamusime.bots.random_bot` — random baseline.
 - `uv run python -m umamusime.bots.mcts` — benchmark MCTS.
-- `uv run python -m umamusime.bots.dqn` — load or create a DQN checkpoint (about 2 minutes to train). Delete `dqn_checkpoint.pt` after changing the observation size or network shape, since `load` will not match the old weights.
+- `uv run python -m umamusime.bots.dqn` — load or create a DQN checkpoint (about 4 minutes to train, under a 5-minute budget). Delete `dqn_checkpoint.pt` after changing the observation size or network shape, since `load` will not match the old weights.
 
 ## Code map
 
